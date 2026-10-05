@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+@theme {
+  --color-royal-50: #eef3ff;
+  --color-royal-100: #dbe5ff;
+  --color-royal-500: #2c52c4;
+  --color-royal-600: #1f3fa0;
+  --color-royal-700: #183282;
+  --color-royal-900: #0f1f55;
+  --color-gold-400: #f7d117;
+  --color-gold-500: #f2c200;
+  --color-gold-600: #d9a900;
+  --color-pink-brand: #e91e8c;
+  --color-leaf: #2e9e4f;
+}
+
+body {
+  font-family: "Segoe UI", "Noto Sans Devanagari", system-ui, sans-serif;
+}
