@@ -1,12 +1,12 @@
 @import "tailwindcss";
 
 @theme {
-  --color-royal-50: #eef3ff;
-  --color-royal-100: #dbe5ff;
-  --color-royal-500: #2c52c4;
-  --color-royal-600: #1f3fa0;
-  --color-royal-700: #183282;
-  --color-royal-900: #0f1f55;
+  --color-royal-50: #f5f8ff;
+  --color-royal-100: #e3ebff;
+  --color-royal-500: #5b7fe0;
+  --color-royal-600: #4a6fd4;
+  --color-royal-700: #3d5cb8;
+  --color-royal-900: #3a4f8f;
   --color-gold-400: #f7d117;
   --color-gold-500: #f2c200;
   --color-gold-600: #d9a900;

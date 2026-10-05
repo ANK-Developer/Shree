@@ -22,7 +22,7 @@ const Footer = () => (
       </div>
     </div>
 
-    <div className="bg-black/30 text-center text-xs py-3 px-4">
+    <div className="bg-black/10 text-center text-xs py-3 px-4">
       © {new Date().getFullYear()} श्री कृष्णा महारानी मण्डल (रजि.), शालीमार बाग, दिल्ली. All rights reserved.
     </div>
   </footer>

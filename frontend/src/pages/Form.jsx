@@ -1,11 +1,10 @@
 import React, { useMemo, useState } from "react";
 
-const inputClass =
-  "w-full px-3.5 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-800 placeholder-gray-400 transition focus:outline-none focus:ring-2 focus:ring-royal-500 focus:border-royal-500";
+const inputClass = "w-full px-3.5 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-800 placeholder-gray-400 transition focus:outline-none focus:ring-2 focus:ring-royal-500 focus:border-royal-500";
 
 const Field = ({ label, required, hint, error, children, className = "" }) => (
   <div className={className}>
-    <label className="block text-sm font-semibold text-royal-900 mb-1.5">
+    <label className="block text-sm font-semibold text-royal-500 mb-1.5">
       {label} {required && <span className="text-pink-brand">*</span>}
     </label>
     {children}
@@ -42,18 +41,21 @@ const occupations = [
   "अन्य / Other",
 ];
 
-const memberTypes = ["ट्रस्टी / Trustee", "सदस्य / Member", "अन्य / Other"];
-
-const relations = [
-  "पिता (Father)",
-  "माता (Mother)",
-  "भाई (Brother)",
-  "बहन (Sister)",
-  "पुत्र (Son)",
-  "पुत्री (Daughter)",
-  "पति (Husband)",
-  "पत्नी (Wife)",
+const memberTypes = [
+  "ट्रस्टी / Trustee",
+  "अध्यक्ष / President",
+  "उपाध्यक्ष / Vice President",
+  "सचिव / Secretary",
+  "कोषाध्यक्ष / Treasurer",
+  "सदस्य / Member",
+  "संस्थापक सदस्य / Founder Member",
+  "कार्यकारी सदस्य / Executive Member",
+  "सलाहकार / Advisor",
+  "मानद सदस्य / Honorary Member",
+  "स्वयंसेवक / Volunteer",
+  "अन्य / Other",
 ];
+const relations = ["पिता (Father)", "माता (Mother)", "भाई (Brother)", "बहन (Sister)", "पुत्र (Son)", "पुत्री (Daughter)", "पति (Husband)", "पत्नी (Wife)"];
 
 const initialForm = {
   name: "",
@@ -106,8 +108,7 @@ const MembershipForm = () => {
   const blur = (name) => () => setTouched((t) => ({ ...t, [name]: true }));
   const bind = (name, max) => ({ name, value: form[name], onChange: set(name, max), onBlur: blur(name), className: inputClass });
 
-  const updateMember = (i, key, value) =>
-    setMembers((m) => m.map((x, idx) => (idx === i ? { ...x, [key]: value } : x)));
+  const updateMember = (i, key, value) => setMembers((m) => m.map((x, idx) => (idx === i ? { ...x, [key]: value } : x)));
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -141,19 +142,19 @@ const MembershipForm = () => {
           <Section title="फोटो / Photograph" icon="📷">
             <div className="flex justify-center">
               <label className="cursor-pointer group">
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => e.target.files[0] && setPhoto(URL.createObjectURL(e.target.files[0]))}
-                />
+                <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files[0] && setPhoto(URL.createObjectURL(e.target.files[0]))} />
                 <div className="w-36 h-36 rounded-full overflow-hidden border-2 border-dashed border-royal-500/40 bg-royal-50 flex flex-col items-center justify-center text-royal-500 transition group-hover:border-royal-500 group-hover:bg-royal-100">
                   {photo ? (
                     <img src={photo} alt="Preview" className="w-full h-full object-cover" />
                   ) : (
                     <>
                       <svg className="w-10 h-10 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="1.8"
+                          d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                        />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                       </svg>
                       <p className="text-xs font-medium">Upload Photo</p>
@@ -183,9 +184,9 @@ const MembershipForm = () => {
                   ))}
                 </select>
               </Field>
-              <Field label="पैतृक स्थान (निवास) / Ancestral Place (Residence)">
+              {/* <Field label="पैतृक स्थान (निवास) / Ancestral Place (Residence)">
                 <input type="text" {...bind("ancestralPlace")} />
-              </Field>
+              </Field> */}
               <Field label="ब्लड ग्रुप / Blood Group">
                 <select {...bind("bloodGroup")}>
                   <option value="">चुनें / Select</option>
@@ -236,11 +237,7 @@ const MembershipForm = () => {
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="text-base font-bold text-pink-brand">सदस्य #{i + 1}</h4>
                     {members.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => setMembers((arr) => arr.filter((_, idx) => idx !== i))}
-                        className="text-xs font-semibold text-red-500 hover:text-red-700"
-                      >
+                      <button type="button" onClick={() => setMembers((arr) => arr.filter((_, idx) => idx !== i))} className="text-xs font-semibold text-red-500 hover:text-red-700">
                         ✕ हटाएं / Remove
                       </button>
                     )}
@@ -267,11 +264,7 @@ const MembershipForm = () => {
                 </div>
               ))}
             </div>
-            <button
-              type="button"
-              onClick={() => setMembers((arr) => [...arr, { ...emptyMember }])}
-              className="mt-5 bg-royal-600 hover:bg-royal-700 text-white text-sm font-semibold py-2.5 px-5 rounded-xl transition"
-            >
+            <button type="button" onClick={() => setMembers((arr) => [...arr, { ...emptyMember }])} className="mt-5 bg-royal-600 hover:bg-royal-700 text-white text-sm font-semibold py-2.5 px-5 rounded-xl transition">
               + परिवार के सदस्य जोड़ें / Add Family Member
             </button>
           </Section>
