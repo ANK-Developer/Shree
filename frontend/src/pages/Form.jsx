@@ -42,6 +42,8 @@ const occupations = [
   "अन्य / Other",
 ];
 
+const memberTypes = ["ट्रस्टी / Trustee", "सदस्य / Member", "अन्य / Other"];
+
 const relations = [
   "पिता (Father)",
   "माता (Mother)",
@@ -56,8 +58,8 @@ const relations = [
 const initialForm = {
   name: "",
   fatherHusbandName: "",
-  gotra: "",
-  ghatak: "",
+  surname: "",
+  memberType: "",
   ancestralPlace: "",
   bloodGroup: "",
   aadharNumber: "",
@@ -74,8 +76,6 @@ const emptyMember = { name: "", relation: "", dob: "", mobile: "" };
 
 const digits = (v, max) => v.replace(/\D/g, "").slice(0, max);
 
-const dateRegex = /^(0[1-9]|[12]\d|3[01])\/(0[1-9]|1[0-2])\/\d{4}$/;
-
 const MembershipForm = () => {
   const [form, setForm] = useState(initialForm);
   const [members, setMembers] = useState([{ ...emptyMember }]);
@@ -87,13 +87,12 @@ const MembershipForm = () => {
     const e = {};
     if (!form.name.trim()) e.name = "नाम आवश्यक है / Name is required";
     if (!form.fatherHusbandName.trim()) e.fatherHusbandName = "यह जानकारी आवश्यक है / Required";
-    if (!form.gotra.trim()) e.gotra = "गोत्र आवश्यक है / Gotra is required";
+    if (!form.memberType) e.memberType = "प्रकार चुनें / Select type";
     if (form.mobileNumber.length !== 10) e.mobileNumber = "10 अंक का मोबाइल नंबर दें / Enter 10-digit mobile number";
-    if (!dateRegex.test(form.birthDate)) e.birthDate = "dd/mm/yyyy format में दें / Use dd/mm/yyyy";
+    if (!form.birthDate) e.birthDate = "जन्म तिथि आवश्यक है / Date of birth is required";
     if (form.aadharNumber && form.aadharNumber.length !== 12) e.aadharNumber = "12 अंक होने चाहिए / Must be 12 digits";
     if (form.pincode && form.pincode.length !== 6) e.pincode = "6 अंक होने चाहिए / Must be 6 digits";
     if (form.email && !/^\S+@\S+\.\S+$/.test(form.email)) e.email = "सही ई-मेल दें / Enter a valid email";
-    if (form.anniversaryDate && !dateRegex.test(form.anniversaryDate)) e.anniversaryDate = "dd/mm/yyyy format में दें / Use dd/mm/yyyy";
     return e;
   }, [form]);
 
@@ -173,11 +172,16 @@ const MembershipForm = () => {
               <Field label="पिता / पति का नाम / Father's / Husband's Name" required error={err("fatherHusbandName")}>
                 <input type="text" {...bind("fatherHusbandName")} />
               </Field>
-              <Field label="गोत्र / Gotra" required error={err("gotra")}>
-                <input type="text" {...bind("gotra")} />
+              <Field label="सरनेम / Surname" error={err("surname")}>
+                <input type="text" {...bind("surname")} />
               </Field>
-              <Field label="घटक / Ghatak">
-                <input type="text" {...bind("ghatak")} />
+              <Field label="प्रकार / Type" required error={err("memberType")}>
+                <select {...bind("memberType")}>
+                  <option value="">चुनें / Select</option>
+                  {memberTypes.map((t) => (
+                    <option key={t}>{t}</option>
+                  ))}
+                </select>
               </Field>
               <Field label="पैतृक स्थान (निवास) / Ancestral Place (Residence)">
                 <input type="text" {...bind("ancestralPlace")} />
@@ -217,10 +221,10 @@ const MembershipForm = () => {
                 <input type="email" {...bind("email")} />
               </Field>
               <Field label="जन्म तिथि / Date of Birth" required error={err("birthDate")}>
-                <input type="text" placeholder="dd/mm/yyyy" maxLength={10} {...bind("birthDate")} />
+                <input type="date" {...bind("birthDate")} />
               </Field>
               <Field label="विवाह वर्षगांठ / Wedding Anniversary" error={err("anniversaryDate")}>
-                <input type="text" placeholder="dd/mm/yyyy" maxLength={10} {...bind("anniversaryDate")} />
+                <input type="date" {...bind("anniversaryDate")} />
               </Field>
             </div>
           </Section>
@@ -254,7 +258,7 @@ const MembershipForm = () => {
                       </select>
                     </Field>
                     <Field label="जन्म तिथि / DOB">
-                      <input type="text" placeholder="dd/mm/yyyy" maxLength={10} value={m.dob} onChange={(e) => updateMember(i, "dob", e.target.value)} className={inputClass} />
+                      <input type="date" value={m.dob} onChange={(e) => updateMember(i, "dob", e.target.value)} className={inputClass} />
                     </Field>
                     <Field label="मोबाइल / Mobile">
                       <input type="tel" inputMode="numeric" value={m.mobile} onChange={(e) => updateMember(i, "mobile", digits(e.target.value, 10))} className={inputClass} />
