@@ -91,16 +91,14 @@ const rowErrors = (rows) =>
   });
 
 // Nominee / Referral dono ke liye reusable "ek se zyada add karo" section
-const RepeatSection = ({ title, icon, itemLabel, addLabel, rows, showRelation, errors, touched, onChange, onBlur, onAdd, onRemove }) => (
+const RepeatSection = ({ title, icon, itemLabel, addLabel, rows, showRelation, single, errors, touched, onChange, onBlur, onAdd, onRemove }) => (
   <Section title={title} icon={icon}>
     <div className="space-y-4">
       {rows.map((r, i) => (
         <div key={i} className="border border-royal-100 rounded-xl p-4 bg-royal-50/50">
           <div className="flex items-center justify-between mb-3">
-            <h4 className="text-base font-bold text-pink-brand">
-              {itemLabel} #{i + 1}
-            </h4>
-            {rows.length > 1 && (
+            <h4 className="text-base font-bold text-pink-brand">{single ? itemLabel : `${itemLabel} #${i + 1}`}</h4>
+            {!single && rows.length > 1 && (
               <button type="button" onClick={() => onRemove(i)} className="text-xs font-semibold text-red-500 hover:text-red-700">
                 ✕ हटाएं / Remove
               </button>
@@ -134,9 +132,11 @@ const RepeatSection = ({ title, icon, itemLabel, addLabel, rows, showRelation, e
         </div>
       ))}
     </div>
-    <button type="button" onClick={onAdd} className="mt-5 bg-royal-600 hover:bg-royal-700 text-white text-sm font-semibold py-2.5 px-5 rounded-xl transition">
-      {addLabel}
-    </button>
+    {!single && (
+      <button type="button" onClick={onAdd} className="mt-5 bg-royal-600 hover:bg-royal-700 text-white text-sm font-semibold py-2.5 px-5 rounded-xl transition">
+        {addLabel}
+      </button>
+    )}
   </Section>
 );
 
@@ -370,7 +370,7 @@ const MembershipForm = () => {
             title="4. रेफरल / Referral"
             icon="🤝"
             itemLabel="रेफरल"
-            addLabel="+ रेफरल जोड़ें / Add Referral"
+            single
             rows={referrals}
             errors={referralErrors}
             touched={listTouched.referral}
