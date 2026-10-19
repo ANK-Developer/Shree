@@ -76,11 +76,76 @@ const initialForm = {
 
 const emptyMember = { name: "", relation: "", dob: "", mobile: "" };
 
+const emptyNominee = { name: "", relation: "", mobile: "" };
+const emptyReferral = { name: "", mobile: "" };
+
 const digits = (v, max) => v.replace(/\D/g, "").slice(0, max);
+
+// Name + mobile (10 digits) mandatory; har row ke errors return karta hai
+const rowErrors = (rows) =>
+  rows.map((r) => {
+    const e = {};
+    if (!r.name.trim()) e.name = "नाम आवश्यक है / Name is required";
+    if (r.mobile.length !== 10) e.mobile = "10 अंक का मोबाइल नंबर दें / Enter 10-digit mobile number";
+    return e;
+  });
+
+// Nominee / Referral dono ke liye reusable "ek se zyada add karo" section
+const RepeatSection = ({ title, icon, itemLabel, addLabel, rows, showRelation, errors, touched, onChange, onBlur, onAdd, onRemove }) => (
+  <Section title={title} icon={icon}>
+    <div className="space-y-4">
+      {rows.map((r, i) => (
+        <div key={i} className="border border-royal-100 rounded-xl p-4 bg-royal-50/50">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-base font-bold text-pink-brand">
+              {itemLabel} #{i + 1}
+            </h4>
+            {rows.length > 1 && (
+              <button type="button" onClick={() => onRemove(i)} className="text-xs font-semibold text-red-500 hover:text-red-700">
+                ✕ हटाएं / Remove
+              </button>
+            )}
+          </div>
+          <div className={`grid grid-cols-1 gap-4 ${showRelation ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
+            <Field label="नाम / Name" required error={touched[`${i}.name`] ? errors[i]?.name : undefined}>
+              <input type="text" value={r.name} onChange={(e) => onChange(i, "name", e.target.value)} onBlur={() => onBlur(i, "name")} className={inputClass} />
+            </Field>
+            {showRelation && (
+              <Field label="रिश्ता / Relation">
+                <select value={r.relation} onChange={(e) => onChange(i, "relation", e.target.value)} className={inputClass}>
+                  <option value="">-- चुनें / Select --</option>
+                  {relations.map((rel) => (
+                    <option key={rel}>{rel}</option>
+                  ))}
+                </select>
+              </Field>
+            )}
+            <Field label="फोन / Phone" required error={touched[`${i}.mobile`] ? errors[i]?.mobile : undefined}>
+              <input
+                type="tel"
+                inputMode="numeric"
+                value={r.mobile}
+                onChange={(e) => onChange(i, "mobile", digits(e.target.value, 10))}
+                onBlur={() => onBlur(i, "mobile")}
+                className={inputClass}
+              />
+            </Field>
+          </div>
+        </div>
+      ))}
+    </div>
+    <button type="button" onClick={onAdd} className="mt-5 bg-royal-600 hover:bg-royal-700 text-white text-sm font-semibold py-2.5 px-5 rounded-xl transition">
+      {addLabel}
+    </button>
+  </Section>
+);
 
 const MembershipForm = () => {
   const [form, setForm] = useState(initialForm);
   const [members, setMembers] = useState([{ ...emptyMember }]);
+  const [nominees, setNominees] = useState([{ ...emptyNominee }]);
+  const [referrals, setReferrals] = useState([{ ...emptyReferral }]);
+  const [listTouched, setListTouched] = useState({ nominee: {}, referral: {} });
   const [photo, setPhoto] = useState(null);
   const [touched, setTouched] = useState({});
   const [success, setSuccess] = useState(false);
@@ -98,7 +163,11 @@ const MembershipForm = () => {
     return e;
   }, [form]);
 
-  const isValid = Object.keys(errors).length === 0;
+  const nomineeErrors = useMemo(() => rowErrors(nominees), [nominees]);
+  const referralErrors = useMemo(() => rowErrors(referrals), [referrals]);
+  const listsValid = [...nomineeErrors, ...referralErrors].every((e) => Object.keys(e).length === 0);
+
+  const isValid = Object.keys(errors).length === 0 && listsValid;
   const err = (k) => (touched[k] ? errors[k] : undefined);
 
   const set = (name, max) => (e) => {
@@ -109,6 +178,16 @@ const MembershipForm = () => {
   const bind = (name, max) => ({ name, value: form[name], onChange: set(name, max), onBlur: blur(name), className: inputClass });
 
   const updateMember = (i, key, value) => setMembers((m) => m.map((x, idx) => (idx === i ? { ...x, [key]: value } : x)));
+
+  // Nominee / Referral rows ke helpers (kind = "nominee" | "referral")
+  const lists = { nominee: [nominees, setNominees, emptyNominee], referral: [referrals, setReferrals, emptyReferral] };
+  const updateRow = (kind, i, key, value) => lists[kind][1]((rows) => rows.map((x, idx) => (idx === i ? { ...x, [key]: value } : x)));
+  const addRow = (kind) => lists[kind][1]((rows) => [...rows, { ...lists[kind][2] }]);
+  const removeRow = (kind, i) => {
+    lists[kind][1]((rows) => rows.filter((_, idx) => idx !== i));
+    setListTouched((t) => ({ ...t, [kind]: {} })); // indexes shift ho jaate hain
+  };
+  const blurRow = (kind, i, key) => setListTouched((t) => ({ ...t, [kind]: { ...t[kind], [`${i}.${key}`]: true } }));
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -122,6 +201,9 @@ const MembershipForm = () => {
   const reset = () => {
     setForm(initialForm);
     setMembers([{ ...emptyMember }]);
+    setNominees([{ ...emptyNominee }]);
+    setReferrals([{ ...emptyReferral }]);
+    setListTouched({ nominee: {}, referral: {} });
     setPhoto(null);
     setTouched({});
     setSuccess(false);
@@ -268,6 +350,35 @@ const MembershipForm = () => {
               + परिवार के सदस्य जोड़ें / Add Family Member
             </button>
           </Section>
+
+          <RepeatSection
+            title="3. नॉमिनी / Nominee"
+            icon="🧾"
+            itemLabel="नॉमिनी"
+            addLabel="+ नॉमिनी जोड़ें / Add Nominee"
+            showRelation
+            rows={nominees}
+            errors={nomineeErrors}
+            touched={listTouched.nominee}
+            onChange={(i, k, v) => updateRow("nominee", i, k, v)}
+            onBlur={(i, k) => blurRow("nominee", i, k)}
+            onAdd={() => addRow("nominee")}
+            onRemove={(i) => removeRow("nominee", i)}
+          />
+
+          <RepeatSection
+            title="4. रेफरल / Referral"
+            icon="🤝"
+            itemLabel="रेफरल"
+            addLabel="+ रेफरल जोड़ें / Add Referral"
+            rows={referrals}
+            errors={referralErrors}
+            touched={listTouched.referral}
+            onChange={(i, k, v) => updateRow("referral", i, k, v)}
+            onBlur={(i, k) => blurRow("referral", i, k)}
+            onAdd={() => addRow("referral")}
+            onRemove={(i) => removeRow("referral", i)}
+          />
 
           <div className="mb-8 text-center">
             <button
