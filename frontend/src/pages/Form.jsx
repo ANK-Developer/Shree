@@ -1,4 +1,10 @@
 import React, { useMemo, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { toast } from "react-toastify";
+import { submitMember } from "../features/members/membersSlice";
+
+const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const PHOTO_MAX_SIZE = 2 * 1024 * 1024; // backend limit ke saath same
 
 const inputClass = "w-full px-3.5 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-800 placeholder-gray-400 transition focus:outline-none focus:ring-2 focus:ring-royal-500 focus:border-royal-500";
 
@@ -81,31 +87,36 @@ const emptyReferral = { name: "", mobile: "" };
 
 const digits = (v, max) => v.replace(/\D/g, "").slice(0, max);
 
-// Name + mobile (10 digits) mandatory; har row ke errors return karta hai
-const rowErrors = (rows) =>
+// required=true: name + mobile mandatory. required=false: optional, par mobile bhare to 10 digit hona chahiye
+const rowErrors = (rows, required = true) =>
   rows.map((r) => {
     const e = {};
-    if (!r.name.trim()) e.name = "नाम आवश्यक है / Name is required";
-    if (r.mobile.length !== 10) e.mobile = "10 अंक का मोबाइल नंबर दें / Enter 10-digit mobile number";
+    if (required && !r.name.trim()) e.name = "नाम आवश्यक है / Name is required";
+    if ((required || r.mobile) && r.mobile.length !== 10) e.mobile = "10 अंक का मोबाइल नंबर दें / Enter 10-digit mobile number";
     return e;
   });
 
 // Nominee / Referral dono ke liye reusable "ek se zyada add karo" section
-const RepeatSection = ({ title, icon, itemLabel, addLabel, rows, showRelation, single, errors, touched, onChange, onBlur, onAdd, onRemove }) => (
+const RepeatSection = ({ title, icon, itemLabel, addLabel, rows, showRelation, single, required = true, nameLabel = "नाम / Name", phoneLabel = "फोन / Phone", errors, touched, onChange, onBlur, onAdd, onRemove }) => (
   <Section title={title} icon={icon}>
     <div className="space-y-4">
       {rows.map((r, i) => (
-        <div key={i} className="border border-royal-100 rounded-xl p-4 bg-royal-50/50">
-          <div className="flex items-center justify-between mb-3">
-            <h4 className="text-base font-bold text-pink-brand">{single ? itemLabel : `${itemLabel} #${i + 1}`}</h4>
-            {!single && rows.length > 1 && (
-              <button type="button" onClick={() => onRemove(i)} className="text-xs font-semibold text-red-500 hover:text-red-700">
-                ✕ हटाएं / Remove
-              </button>
-            )}
-          </div>
+        // single: section hi parent card hai, andar alag child card nahi
+        <div key={i} className={single ? "" : "border border-royal-100 rounded-xl p-4 bg-royal-50/50"}>
+          {!single && (
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-base font-bold text-pink-brand">
+                {itemLabel} #{i + 1}
+              </h4>
+              {rows.length > 1 && (
+                <button type="button" onClick={() => onRemove(i)} className="text-xs font-semibold text-red-500 hover:text-red-700">
+                  ✕ हटाएं / Remove
+                </button>
+              )}
+            </div>
+          )}
           <div className={`grid grid-cols-1 gap-4 ${showRelation ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
-            <Field label="नाम / Name" required error={touched[`${i}.name`] ? errors[i]?.name : undefined}>
+            <Field label={nameLabel} required={required} error={touched[`${i}.name`] ? errors[i]?.name : undefined}>
               <input type="text" value={r.name} onChange={(e) => onChange(i, "name", e.target.value)} onBlur={() => onBlur(i, "name")} className={inputClass} />
             </Field>
             {showRelation && (
@@ -118,7 +129,7 @@ const RepeatSection = ({ title, icon, itemLabel, addLabel, rows, showRelation, s
                 </select>
               </Field>
             )}
-            <Field label="फोन / Phone" required error={touched[`${i}.mobile`] ? errors[i]?.mobile : undefined}>
+            <Field label={phoneLabel} required={required} error={touched[`${i}.mobile`] ? errors[i]?.mobile : undefined}>
               <input
                 type="tel"
                 inputMode="numeric"
@@ -146,7 +157,10 @@ const MembershipForm = () => {
   const [nominees, setNominees] = useState([{ ...emptyNominee }]);
   const [referrals, setReferrals] = useState([{ ...emptyReferral }]);
   const [listTouched, setListTouched] = useState({ nominee: {}, referral: {} });
-  const [photo, setPhoto] = useState(null);
+  const [photo, setPhoto] = useState(null); // preview URL
+  const [photoFile, setPhotoFile] = useState(null); // upload hone wali actual file
+  const submitting = useSelector((s) => s.members.submitting);
+  const dispatch = useDispatch();
   const [touched, setTouched] = useState({});
   const [success, setSuccess] = useState(false);
 
@@ -164,7 +178,7 @@ const MembershipForm = () => {
   }, [form]);
 
   const nomineeErrors = useMemo(() => rowErrors(nominees), [nominees]);
-  const referralErrors = useMemo(() => rowErrors(referrals), [referrals]);
+  const referralErrors = useMemo(() => rowErrors(referrals, false), [referrals]);
   const listsValid = [...nomineeErrors, ...referralErrors].every((e) => Object.keys(e).length === 0);
 
   const isValid = Object.keys(errors).length === 0 && listsValid;
@@ -189,13 +203,39 @@ const MembershipForm = () => {
   };
   const blurRow = (kind, i, key) => setListTouched((t) => ({ ...t, [kind]: { ...t[kind], [`${i}.${key}`]: true } }));
 
-  const handleSubmit = (e) => {
+  const handlePhoto = (e) => {
+    const file = e.target.files[0];
+    e.target.value = ""; // same file dobara choose karne par bhi onChange chale
+    if (!file) return;
+    if (!PHOTO_TYPES.includes(file.type)) return toast.error("Only JPG, PNG or WEBP images are allowed");
+    if (file.size > PHOTO_MAX_SIZE) return toast.error("Photo must be 2MB or smaller");
+
+    if (photo) URL.revokeObjectURL(photo);
+    setPhotoFile(file);
+    setPhoto(URL.createObjectURL(file));
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!isValid) {
       setTouched(Object.fromEntries(Object.keys(initialForm).map((k) => [k, true])));
       return;
     }
-    setSuccess(true);
+
+    const data = new FormData();
+    Object.entries(form).forEach(([key, value]) => data.append(key, value));
+    data.append("familyMembers", JSON.stringify(members));
+    data.append("nominees", JSON.stringify(nominees));
+    data.append("referrals", JSON.stringify(referrals));
+    if (photoFile) data.append("photo", photoFile);
+
+    try {
+      const res = await dispatch(submitMember(data)).unwrap();
+      toast.success(res.message);
+      setSuccess(true);
+    } catch (message) {
+      toast.error(message);
+    }
   };
 
   const reset = () => {
@@ -204,7 +244,9 @@ const MembershipForm = () => {
     setNominees([{ ...emptyNominee }]);
     setReferrals([{ ...emptyReferral }]);
     setListTouched({ nominee: {}, referral: {} });
+    if (photo) URL.revokeObjectURL(photo);
     setPhoto(null);
+    setPhotoFile(null);
     setTouched({});
     setSuccess(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -224,7 +266,7 @@ const MembershipForm = () => {
           <Section title="फोटो / Photograph" icon="📷">
             <div className="flex justify-center">
               <label className="cursor-pointer group">
-                <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files[0] && setPhoto(URL.createObjectURL(e.target.files[0]))} />
+                <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handlePhoto} />
                 <div className="w-36 h-36 rounded-full overflow-hidden border-2 border-dashed border-royal-500/40 bg-royal-50 flex flex-col items-center justify-center text-royal-500 transition group-hover:border-royal-500 group-hover:bg-royal-100">
                   {photo ? (
                     <img src={photo} alt="Preview" className="w-full h-full object-cover" />
@@ -371,6 +413,9 @@ const MembershipForm = () => {
             icon="🤝"
             itemLabel="रेफरल"
             single
+            required={false}
+            nameLabel="रेफर करने वाले का नाम / Referred By"
+            phoneLabel="रेफर करने वाले का मोबाइल नंबर / Referrer's Mobile Number"
             rows={referrals}
             errors={referralErrors}
             touched={listTouched.referral}
@@ -383,10 +428,10 @@ const MembershipForm = () => {
           <div className="mb-8 text-center">
             <button
               type="submit"
-              disabled={!isValid}
+              disabled={!isValid || submitting}
               className="w-full md:w-auto bg-royal-600 hover:bg-royal-700 text-white font-bold text-lg py-3 px-16 rounded-full shadow-lg border-b-4 border-gold-500 transition disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-royal-600"
             >
-              Submit
+              {submitting ? "Submitting..." : "Submit"}
             </button>
             {!isValid && <p className="text-xs text-gray-500 mt-2">* वाले सभी विवरण भरें / Fill all required (*) fields</p>}
           </div>

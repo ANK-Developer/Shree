@@ -1,8 +1,7 @@
 const bcrypt = require("bcryptjs");
 const mongoose = require("mongoose");
 const User = require("../models/User");
-
-const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const escapeRegex = require("../utils/escapeRegex");
 
 // GET /api/admins?search=
 const getAdmins = async (req, res) => {

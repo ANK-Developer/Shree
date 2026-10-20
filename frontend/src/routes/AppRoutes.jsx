@@ -6,6 +6,7 @@ import AdminLayout from "../layouts/AdminLayout";
 import Dashboard from "../pages/admin/Dashboard";
 import ImportantDates from "../pages/admin/ImportantDates";
 import Members from "../pages/admin/Members";
+import MemberProfile from "../pages/admin/MemberProfile";
 import Events from "../pages/admin/Events";
 import Admins from "../pages/admin/Admins";
 import ProtectedRoute from "./ProtectedRoute";
@@ -27,6 +28,7 @@ const AppRoutes = () => (
         <Route path="/admin/dashboard" element={<Dashboard />} />
         <Route path="/admin/important-dates" element={<ImportantDates />} />
         <Route path="/admin/members" element={<Members />} />
+        <Route path="/admin/members/:id" element={<MemberProfile />} />
         <Route path="/admin/events" element={<Events />} />
         <Route path="/admin/admins" element={<Admins />} />
       </Route>
