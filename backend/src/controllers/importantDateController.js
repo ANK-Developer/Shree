@@ -1,5 +1,4 @@
-const Member = require("../models/Member");
-const escapeRegex = require("../utils/escapeRegex");
+const { prisma } = require("../config/db");
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const STATUSES = ["ACTIVE", "INACTIVE"];
@@ -8,6 +7,9 @@ const EVENT_TYPES = ["BIRTHDAY", "ANNIVERSARY"];
 // range -> aaj se kitne din ke andar (aaj = 0 din). "all" me koi limit nahi.
 const RANGE_DAYS = { today: 0, next7: 7, next30: 30 };
 
+// Mongo jaisa binary string compare (sort order pehle jaisa rahe)
+const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+
 // GET /api/important-dates?range=today|next7|next30|all&type=&status=&search=&page=&limit=
 //
 // Har member ke birthday aur anniversary ko alag-alag "event" ki tarah leta hai, har saal repeat hone wali
@@ -15,106 +17,65 @@ const RANGE_DAYS = { today: 0, next7: 7, next30: 30 };
 // Dashboard aur Important Dates page dono isi query ko use karte hain.
 // Filters already normalized hone chahiye (range valid key, type/status uppercase, search trimmed).
 const queryImportantDates = async ({ page = 1, limit = 10, range = "all", type = "", status = "", search = "" }) => {
-  // Dates DB me UTC midnight par store hain, isliye "aaj" bhi UTC midnight bana kar compare karte hain
+  // Dates DB me DATE (UTC midnight) hain, isliye "aaj" bhi UTC midnight bana kar compare karte hain
   const now = new Date();
   const year = now.getFullYear();
-  const today = new Date(Date.UTC(year, now.getMonth(), now.getDate()));
+  const today = Date.UTC(year, now.getMonth(), now.getDate());
 
-  const memberMatch = {};
-  if (STATUSES.includes(status)) memberMatch.memberStatus = status;
-  if (search) {
-    const regex = new RegExp(escapeRegex(search), "i");
-    memberMatch.$or = [{ name: regex }, { mobileNumber: regex }];
+  const where = {};
+  if (STATUSES.includes(status)) where.memberStatus = status;
+  if (search) where.OR = [{ name: { contains: search } }, { mobileNumber: { contains: search } }];
+
+  const members = await prisma.member.findMany({
+    where,
+    select: {
+      id: true,
+      photoUrl: true,
+      name: true,
+      surname: true,
+      mobileNumber: true,
+      memberType: true,
+      memberStatus: true,
+      birthDate: true,
+      anniversaryDate: true,
+    },
+  });
+
+  const rows = [];
+  for (const { birthDate, anniversaryDate, id, ...member } of members) {
+    const events = [
+      { eventType: "BIRTHDAY", date: birthDate },
+      { eventType: "ANNIVERSARY", date: anniversaryDate },
+    ];
+
+    for (const { eventType, date } of events) {
+      // sirf wahi events jinki date bhari hai, aur type filter match kare
+      if (!date || (EVENT_TYPES.includes(type) && eventType !== type)) continue;
+
+      const month = date.getUTCMonth();
+      const day = date.getUTCDate();
+      // Is saal ki date; wo nikal chuki ho to agle saal ki (29 Feb non-leap year me 1 Mar ban jata hai, pehle jaisa)
+      let next = Date.UTC(year, month, day);
+      if (next < today) next = Date.UTC(year + 1, month, day);
+
+      const nextDate = new Date(next);
+      const daysUntil = Math.round((next - today) / DAY_MS);
+      if (range !== "all" && daysUntil > RANGE_DAYS[range]) continue;
+
+      rows.push({
+        memberId: id,
+        ...member,
+        eventType,
+        nextDate,
+        daysUntil,
+        years: nextDate.getUTCFullYear() - date.getUTCFullYear(),
+      });
+    }
   }
 
-  const typeCond = EVENT_TYPES.includes(type) ? { $eq: ["$$e.type", type] } : true;
+  rows.sort((a, b) => a.daysUntil - b.daysUntil || cmp(a.name, b.name) || cmp(a.eventType, b.eventType));
 
-  const pipeline = [
-    { $match: memberMatch },
-    {
-      $project: {
-        photoUrl: 1,
-        name: 1,
-        surname: 1,
-        mobileNumber: 1,
-        memberType: 1,
-        memberStatus: 1,
-        events: {
-          $filter: {
-            input: [
-              { type: "BIRTHDAY", date: "$birthDate" },
-              { type: "ANNIVERSARY", date: "$anniversaryDate" },
-            ],
-            as: "e",
-            // $gt null: sirf wahi events jinki date bhari hai (null/missing hat jate hain)
-            cond: { $and: [{ $gt: ["$$e.date", null] }, typeCond] },
-          },
-        },
-      },
-    },
-    { $unwind: "$events" },
-    {
-      $addFields: {
-        eventType: "$events.type",
-        eventDate: "$events.date",
-        month: { $month: "$events.date" },
-        day: { $dayOfMonth: "$events.date" },
-      },
-    },
-    // Is saal ki date; wo nikal chuki ho to agle saal ki
-    { $addFields: { thisYear: { $dateFromParts: { year, month: "$month", day: "$day" } } } },
-    {
-      $addFields: {
-        nextDate: {
-          $cond: [
-            { $lt: ["$thisYear", today] },
-            { $dateFromParts: { year: year + 1, month: "$month", day: "$day" } },
-            "$thisYear",
-          ],
-        },
-      },
-    },
-    {
-      $addFields: {
-        daysUntil: { $round: [{ $divide: [{ $subtract: ["$nextDate", today] }, DAY_MS] }, 0] },
-        years: { $subtract: [{ $year: "$nextDate" }, { $year: "$eventDate" }] },
-      },
-    },
-  ];
-
-  if (range !== "all") pipeline.push({ $match: { daysUntil: { $lte: RANGE_DAYS[range] } } });
-
-  pipeline.push(
-    { $sort: { daysUntil: 1, name: 1, eventType: 1 } },
-    {
-      $facet: {
-        rows: [
-          { $skip: (page - 1) * limit },
-          { $limit: limit },
-          {
-            $project: {
-              _id: 0,
-              memberId: "$_id",
-              photoUrl: 1,
-              name: 1,
-              surname: 1,
-              mobileNumber: 1,
-              memberType: 1,
-              memberStatus: 1,
-              eventType: 1,
-              nextDate: 1,
-              daysUntil: 1,
-              years: 1,
-            },
-          },
-        ],
-        total: [{ $count: "n" }],
-      },
-    },
-  );
-
-  const [{ rows, total }] = await Member.aggregate(pipeline);
-  return { rows, count: total[0]?.n || 0 };
+  return { rows: rows.slice((page - 1) * limit, page * limit), count: rows.length };
 };
 
 const getImportantDates = async (req, res) => {

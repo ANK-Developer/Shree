@@ -1,19 +1,13 @@
-const mongoose = require("mongoose");
-const Event = require("../models/Event");
-const EventParticipant = require("../models/EventParticipant");
-const EventCall = require("../models/EventCall");
-const Member = require("../models/Member");
-const escapeRegex = require("../utils/escapeRegex");
+const { prisma } = require("../config/db");
+const { toApi, isValidId } = require("../utils/toApi");
 const { BANNER_URL_PREFIX, removeUploadedFile } = require("../middleware/upload");
 
-const EVENT_STATUSES = Event.schema.path("status").enumValues;
-const PARTICIPATION_STATUSES = EventParticipant.schema.path("participationStatus").enumValues;
-const CALL_STATUSES = EventCall.schema.path("callStatus").enumValues;
+const EVENT_STATUSES = ["UPCOMING", "LIVE", "COMPLETED", "CANCELLED"];
+const PARTICIPATION_STATUSES = ["ACCEPTED", "REJECTED", "NOT_CONFIRMED"];
+const CALL_STATUSES = ["PENDING", "ANSWERED", "NOT_ANSWERED", "BUSY", "FAILED"];
 
 // eventBanner yahan nahi: wo text field nahi, uploaded file se aata hai
 const EVENT_FIELDS = ["eventName", "description", "status", "venue", "startDateTime", "endDateTime"];
-
-const isValidId = (id) => mongoose.isValidObjectId(id);
 
 const pageParams = (query, defaultLimit = 10) => ({
   page: Math.max(parseInt(query.page, 10) || 1, 1),
@@ -30,64 +24,94 @@ const pick = (body) => {
   return data;
 };
 
+// Pehle Mongoose schema ye rules check karta tha. data = poora event (create: picked fields, update: purana + naya)
+// return: { errors, data } jisme dates Date object ban chuki hoti hain
+const validateEvent = (input) => {
+  const errors = [];
+  const data = { ...input, status: input.status || "UPCOMING" };
+
+  const text = (key, label, max) => {
+    data[key] = String(data[key] ?? "").trim();
+    if (!data[key]) errors.push(`${label} is required`);
+    else if (data[key].length > max) errors.push(`${label} must be at most ${max} characters`);
+  };
+  const date = (key, label) => {
+    if (!data[key]) return errors.push(`${label} is required`);
+    const d = data[key] instanceof Date ? data[key] : new Date(data[key]);
+    if (Number.isNaN(d.getTime())) return errors.push(`${label} is invalid`);
+    data[key] = d;
+  };
+
+  text("eventName", "Event name", 150);
+  text("description", "Description", 5000);
+  text("venue", "Venue", 300);
+  if (!EVENT_STATUSES.includes(data.status)) errors.push("Invalid event status");
+  date("startDateTime", "Start date and time");
+  date("endDateTime", "End date and time");
+
+  if (data.startDateTime instanceof Date && data.endDateTime instanceof Date && data.endDateTime <= data.startDateTime) {
+    errors.push("End date and time must be after start date and time");
+  }
+  return { errors, data };
+};
+
 const handleError = (res, error, label) => {
-  if (error.name === "ValidationError") {
-    const messages = Object.values(error.errors).map((e) => e.message);
-    return res.status(400).json({ success: false, message: messages.join(", ") });
-  }
-  if (error.name === "CastError") {
-    return res.status(400).json({ success: false, message: "Invalid value" });
-  }
   console.error(`${label} failed:`, error.message);
   res.status(500).json({ success: false, message: "Server error" });
 };
 
 // Event ke participant counts: { total, ACCEPTED, REJECTED, NOT_CONFIRMED }
 const participantCounts = async (eventIds) => {
-  const rows = await EventParticipant.aggregate([
-    { $match: { eventId: { $in: eventIds } } },
-    { $group: { _id: { eventId: "$eventId", status: "$participationStatus" }, n: { $sum: 1 } } },
-  ]);
-
   const map = new Map();
-  eventIds.forEach((id) => map.set(String(id), { total: 0, ACCEPTED: 0, REJECTED: 0, NOT_CONFIRMED: 0 }));
-  rows.forEach(({ _id, n }) => {
-    const entry = map.get(String(_id.eventId));
-    entry[_id.status] = n;
-    entry.total += n;
+  eventIds.forEach((id) => map.set(id, { total: 0, ACCEPTED: 0, REJECTED: 0, NOT_CONFIRMED: 0 }));
+  if (eventIds.length === 0) return map;
+
+  const rows = await prisma.eventParticipant.groupBy({
+    by: ["eventId", "participationStatus"],
+    where: { eventId: { in: eventIds } },
+    _count: { _all: true },
+  });
+
+  rows.forEach(({ eventId, participationStatus, _count }) => {
+    const entry = map.get(eventId);
+    entry[participationStatus] = _count._all;
+    entry.total += _count._all;
   });
   return map;
 };
 
-// Jo ACTIVE members is event me abhi tak nahi hain unko add karta hai. Unique index (eventId+memberId) ki wajah se
-// parallel/repeat call par bhi duplicate nahi banta (ordered:false => duplicates skip, baaki insert).
+// Jo ACTIVE members is event me abhi tak nahi hain unko add karta hai. Unique key (eventId+memberId) + skipDuplicates
+// ki wajah se parallel/repeat call par bhi duplicate nahi banta.
 const addMissingParticipants = async (eventId) => {
-  const existing = await EventParticipant.distinct("memberId", { eventId });
-  const members = await Member.find({ memberStatus: "ACTIVE", _id: { $nin: existing } }).select("_id").lean();
+  const members = await prisma.member.findMany({
+    where: { memberStatus: "ACTIVE", participations: { none: { eventId } } },
+    select: { id: true },
+  });
   if (members.length === 0) return 0;
 
-  try {
-    const inserted = await EventParticipant.insertMany(
-      members.map((m) => ({ eventId, memberId: m._id })),
-      { ordered: false },
-    );
-    return inserted.length;
-  } catch (error) {
-    if (error.code === 11000 || error.writeErrors) return error.insertedDocs?.length || 0;
-    throw error;
-  }
+  const { count } = await prisma.eventParticipant.createMany({
+    data: members.map((m) => ({ eventId, memberId: m.id })),
+    skipDuplicates: true,
+  });
+  return count;
 };
 
 // POST /api/events
 const createEvent = async (req, res) => {
+  const eventBanner = req.file ? `${BANNER_URL_PREFIX}/${req.file.filename}` : null;
   try {
-    const eventBanner = req.file ? `${BANNER_URL_PREFIX}/${req.file.filename}` : null;
-    const event = await Event.create({ ...pick(req.body), eventBanner, createdBy: req.user._id });
-    const participants = await addMissingParticipants(event._id);
+    const { errors, data } = validateEvent(pick(req.body));
+    if (errors.length) {
+      removeUploadedFile(eventBanner); // fail hui to orphan file na rahe
+      return res.status(400).json({ success: false, message: errors.join(", ") });
+    }
 
-    res.status(201).json({ success: true, message: "Event created successfully", event, participants });
+    const event = await prisma.event.create({ data: { ...data, eventBanner, createdBy: req.user.id } });
+    const participants = await addMissingParticipants(event.id);
+
+    res.status(201).json({ success: true, message: "Event created successfully", event: toApi(event), participants });
   } catch (error) {
-    if (req.file) removeUploadedFile(`${BANNER_URL_PREFIX}/${req.file.filename}`); // fail hui to orphan file na rahe
+    removeUploadedFile(eventBanner);
     handleError(res, error, "createEvent");
   }
 };
@@ -99,38 +123,43 @@ const getEvents = async (req, res) => {
     const status = String(req.query.status || "").toUpperCase();
     const search = String(req.query.search || "").trim();
 
-    const filter = {};
-    if (EVENT_STATUSES.includes(status)) filter.status = status;
-    if (search) filter.eventName = new RegExp(escapeRegex(search), "i");
+    const where = {};
+    if (EVENT_STATUSES.includes(status)) where.status = status;
+    if (search) where.eventName = { contains: search };
 
     const [events, total] = await Promise.all([
-      Event.find(filter)
-        .sort({ startDateTime: -1 })
-        .skip((page - 1) * limit)
-        .limit(limit)
-        .lean(),
-      Event.countDocuments(filter),
+      prisma.event.findMany({
+        where,
+        orderBy: { startDateTime: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.event.count({ where }),
     ]);
 
-    const counts = await participantCounts(events.map((e) => e._id));
-    const list = events.map((e) => ({ ...e, counts: counts.get(String(e._id)) }));
+    const counts = await participantCounts(events.map((e) => e.id));
+    const list = events.map((e) => ({ ...e, counts: counts.get(e.id) }));
 
-    res.status(200).json({ success: true, events: list, pagination: paginate(page, limit, total) });
+    res.status(200).json({ success: true, events: toApi(list), pagination: paginate(page, limit, total) });
   } catch (error) {
     handleError(res, error, "getEvents");
   }
 };
 
-// GET /api/events/:id  -> event + participant counts
+// GET /api/events/:id  -> event + participant counts (createdBy: { _id, name })
 const getEventById = async (req, res) => {
   try {
     if (!isValidId(req.params.id)) return res.status(404).json({ success: false, message: "Event not found" });
 
-    const event = await Event.findById(req.params.id).populate("createdBy", "name").lean();
+    const event = await prisma.event.findUnique({
+      where: { id: req.params.id },
+      include: { creator: { select: { id: true, name: true } } },
+    });
     if (!event) return res.status(404).json({ success: false, message: "Event not found" });
 
-    const counts = await participantCounts([event._id]);
-    res.status(200).json({ success: true, event: { ...event, counts: counts.get(String(event._id)) } });
+    const counts = await participantCounts([event.id]);
+    const { creator, ...rest } = event;
+    res.status(200).json({ success: true, event: toApi({ ...rest, createdBy: creator, counts: counts.get(event.id) }) });
   } catch (error) {
     handleError(res, error, "getEventById");
   }
@@ -140,23 +169,34 @@ const getEventById = async (req, res) => {
 const updateEvent = async (req, res) => {
   const newBanner = req.file ? `${BANNER_URL_PREFIX}/${req.file.filename}` : null;
   try {
-    const event = isValidId(req.params.id) ? await Event.findById(req.params.id) : null;
-    if (!event) {
+    const existing = isValidId(req.params.id) ? await prisma.event.findUnique({ where: { id: req.params.id } }) : null;
+    if (!existing) {
       removeUploadedFile(newBanner);
       return res.status(404).json({ success: false, message: "Event not found" });
     }
 
-    const oldBanner = event.eventBanner;
-    // set + save() => validators (endDateTime > startDateTime) document context ke saath chalte hain
-    event.set(pick(req.body));
-    if (newBanner) event.eventBanner = newBanner;
-    else if (req.body.removeBanner === "true") event.eventBanner = null;
-    await event.save();
+    // Purane + naye fields ko saath me validate karte hain (endDateTime > startDateTime)
+    const merged = {};
+    EVENT_FIELDS.forEach((key) => {
+      merged[key] = existing[key];
+    });
+    const { errors, data } = validateEvent({ ...merged, ...pick(req.body) });
+    if (errors.length) {
+      removeUploadedFile(newBanner);
+      return res.status(400).json({ success: false, message: errors.join(", ") });
+    }
+
+    const oldBanner = existing.eventBanner;
+    let eventBanner = oldBanner;
+    if (newBanner) eventBanner = newBanner;
+    else if (req.body.removeBanner === "true") eventBanner = null;
+
+    const event = await prisma.event.update({ where: { id: existing.id }, data: { ...data, eventBanner } });
 
     // Purani file tabhi hatate hain jab DB update successful ho chuka ho
     if (oldBanner && oldBanner !== event.eventBanner) removeUploadedFile(oldBanner);
 
-    res.status(200).json({ success: true, message: "Event updated successfully", event });
+    res.status(200).json({ success: true, message: "Event updated successfully", event: toApi(event) });
   } catch (error) {
     removeUploadedFile(newBanner);
     handleError(res, error, "updateEvent");
@@ -171,26 +211,24 @@ const updateEventStatus = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid event status" });
     }
 
-    const event = isValidId(req.params.id) ? await Event.findByIdAndUpdate(req.params.id, { status }, { new: true }) : null;
-    if (!event) return res.status(404).json({ success: false, message: "Event not found" });
+    const exists = isValidId(req.params.id) && (await prisma.event.count({ where: { id: req.params.id } }));
+    if (!exists) return res.status(404).json({ success: false, message: "Event not found" });
 
-    res.status(200).json({ success: true, message: "Event status updated", event });
+    const event = await prisma.event.update({ where: { id: req.params.id }, data: { status } });
+    res.status(200).json({ success: true, message: "Event status updated", event: toApi(event) });
   } catch (error) {
     handleError(res, error, "updateEventStatus");
   }
 };
 
-// DELETE /api/events/:id  (participants aur unke call logs bhi hat jate hain)
+// DELETE /api/events/:id  (participants aur unke call logs DB cascade se hat jate hain)
 const deleteEvent = async (req, res) => {
   try {
-    if (!isValidId(req.params.id)) return res.status(404).json({ success: false, message: "Event not found" });
-
-    const event = await Event.findByIdAndDelete(req.params.id);
+    const event = isValidId(req.params.id) ? await prisma.event.findUnique({ where: { id: req.params.id } }) : null;
     if (!event) return res.status(404).json({ success: false, message: "Event not found" });
 
+    await prisma.event.delete({ where: { id: event.id } });
     removeUploadedFile(event.eventBanner);
-    const ids = await EventParticipant.distinct("_id", { eventId: event._id });
-    await Promise.all([EventCall.deleteMany({ eventParticipantId: { $in: ids } }), EventParticipant.deleteMany({ eventId: event._id })]);
 
     res.status(200).json({ success: true, message: "Event deleted successfully" });
   } catch (error) {
@@ -201,7 +239,7 @@ const deleteEvent = async (req, res) => {
 // POST /api/events/:id/sync-participants  (event ke baad join hue ACTIVE members ko add karta hai)
 const syncParticipants = async (req, res) => {
   try {
-    if (!isValidId(req.params.id) || !(await Event.exists({ _id: req.params.id }))) {
+    if (!isValidId(req.params.id) || !(await prisma.event.count({ where: { id: req.params.id } }))) {
       return res.status(404).json({ success: false, message: "Event not found" });
     }
     const added = await addMissingParticipants(req.params.id);
@@ -219,54 +257,44 @@ const getParticipants = async (req, res) => {
     const { page, limit } = pageParams(req.query);
     const status = String(req.query.status || "").toUpperCase();
     const search = String(req.query.search || "").trim();
-    const eventId = new mongoose.Types.ObjectId(req.params.id);
 
-    const match = { eventId };
-    if (PARTICIPATION_STATUSES.includes(status)) match.participationStatus = status;
-
-    const pipeline = [
-      { $match: match },
-      { $lookup: { from: Member.collection.name, localField: "memberId", foreignField: "_id", as: "member" } },
-      { $unwind: "$member" },
-    ];
-
+    const where = { eventId: req.params.id };
+    if (PARTICIPATION_STATUSES.includes(status)) where.participationStatus = status;
     if (search) {
-      const regex = new RegExp(escapeRegex(search), "i");
-      pipeline.push({ $match: { $or: [{ "member.name": regex }, { "member.surname": regex }, { "member.mobileNumber": regex }] } });
+      where.member = {
+        OR: [{ name: { contains: search } }, { surname: { contains: search } }, { mobileNumber: { contains: search } }],
+      };
     }
 
-    pipeline.push(
-      { $sort: { "member.name": 1, _id: 1 } },
-      {
-        $facet: {
-          rows: [
-            { $skip: (page - 1) * limit },
-            { $limit: limit },
-            {
-              $project: {
-                participationStatus: 1,
-                callCount: 1,
-                lastCalledAt: 1,
-                lastCallStatus: 1,
-                member: {
-                  _id: 1,
-                  photoUrl: 1,
-                  name: 1,
-                  surname: 1,
-                  mobileNumber: 1,
-                  memberType: 1,
-                  memberStatus: 1,
-                },
-              },
+    const [rows, total] = await Promise.all([
+      prisma.eventParticipant.findMany({
+        where,
+        orderBy: [{ member: { name: "asc" } }, { id: "asc" }],
+        skip: (page - 1) * limit,
+        take: limit,
+        select: {
+          id: true,
+          participationStatus: true,
+          callCount: true,
+          lastCalledAt: true,
+          lastCallStatus: true,
+          member: {
+            select: {
+              id: true,
+              photoUrl: true,
+              name: true,
+              surname: true,
+              mobileNumber: true,
+              memberType: true,
+              memberStatus: true,
             },
-          ],
-          total: [{ $count: "n" }],
+          },
         },
-      },
-    );
+      }),
+      prisma.eventParticipant.count({ where }),
+    ]);
 
-    const [{ rows, total }] = await EventParticipant.aggregate(pipeline);
-    res.status(200).json({ success: true, participants: rows, pagination: paginate(page, limit, total[0]?.n || 0) });
+    res.status(200).json({ success: true, participants: toApi(rows), pagination: paginate(page, limit, total) });
   } catch (error) {
     handleError(res, error, "getParticipants");
   }
@@ -274,7 +302,9 @@ const getParticipants = async (req, res) => {
 
 // Participant us event ka hi hai ya nahi (URL tampering se doosre event ka participant na chhua jaye)
 const findParticipant = (eventId, participantId) =>
-  isValidId(eventId) && isValidId(participantId) ? EventParticipant.findOne({ _id: participantId, eventId }) : null;
+  isValidId(eventId) && isValidId(participantId)
+    ? prisma.eventParticipant.findFirst({ where: { id: participantId, eventId } })
+    : null;
 
 // PATCH /api/events/:id/participants/:participantId  { participationStatus }
 const updateParticipantStatus = async (req, res) => {
@@ -284,13 +314,12 @@ const updateParticipantStatus = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid participation status" });
     }
 
-    const participant = await findParticipant(req.params.id, req.params.participantId);
-    if (!participant) return res.status(404).json({ success: false, message: "Participant not found" });
+    const found = await findParticipant(req.params.id, req.params.participantId);
+    if (!found) return res.status(404).json({ success: false, message: "Participant not found" });
 
-    participant.participationStatus = participationStatus;
-    await participant.save();
+    const participant = await prisma.eventParticipant.update({ where: { id: found.id }, data: { participationStatus } });
 
-    res.status(200).json({ success: true, message: "Participation status updated", participant });
+    res.status(200).json({ success: true, message: "Participation status updated", participant: toApi(participant) });
   } catch (error) {
     handleError(res, error, "updateParticipantStatus");
   }
@@ -317,45 +346,61 @@ const addCall = async (req, res) => {
       }
     }
 
+    const response = typeof callResponse === "string" && callResponse.trim() ? callResponse.trim() : null;
+    if (response && response.length > 1000) {
+      return res.status(400).json({ success: false, message: "Call response must be at most 1000 characters" });
+    }
+
     const participant = await findParticipant(req.params.id, req.params.participantId);
     if (!participant) return res.status(404).json({ success: false, message: "Participant not found" });
 
-    const call = await EventCall.create({
-      eventParticipantId: participant._id,
-      callStatus,
-      callResponse: typeof callResponse === "string" && callResponse.trim() ? callResponse.trim() : null,
-      calledAt: calledAtDate,
-      calledBy: req.user._id,
+    // Call + summary ek transaction me; lastCalledAt sirf tab badalta hai jab ye call sabse naya ho (purani call backfill ho sakti hai)
+    const [call, updated] = await prisma.$transaction(async (tx) => {
+      const created = await tx.eventCall.create({
+        data: {
+          eventParticipantId: participant.id,
+          callStatus,
+          callResponse: response,
+          calledAt: calledAtDate,
+          calledBy: req.user.id,
+        },
+      });
+
+      const latest = await tx.eventCall.findFirst({
+        where: { eventParticipantId: participant.id },
+        orderBy: [{ calledAt: "desc" }, { createdAt: "desc" }],
+      });
+
+      const data = {
+        callCount: { increment: 1 },
+        lastCalledAt: latest.calledAt,
+        lastCallStatus: latest.callStatus,
+      };
+      if (participationStatus) data.participationStatus = participationStatus;
+
+      return [created, await tx.eventParticipant.update({ where: { id: participant.id }, data })];
     });
 
-    // Summary fields atomically update; lastCalledAt sirf tab badalta hai jab ye call sabse naya ho (purani call backfill ho sakti hai)
-    const latest = await EventCall.findOne({ eventParticipantId: participant._id }).sort({ calledAt: -1, _id: -1 }).lean();
-    const update = {
-      $inc: { callCount: 1 },
-      $set: { lastCalledAt: latest.calledAt, lastCallStatus: latest.callStatus },
-    };
-    if (participationStatus) update.$set.participationStatus = participationStatus;
-
-    const updated = await EventParticipant.findByIdAndUpdate(participant._id, update, { new: true });
-
-    res.status(201).json({ success: true, message: "Call logged successfully", call, participant: updated });
+    res.status(201).json({ success: true, message: "Call logged successfully", call: toApi(call), participant: toApi(updated) });
   } catch (error) {
     handleError(res, error, "addCall");
   }
 };
 
-// GET /api/events/:id/participants/:participantId/calls  -> poori call history (latest first)
+// GET /api/events/:id/participants/:participantId/calls  -> poori call history (latest first), calledBy: { _id, name }
 const getCalls = async (req, res) => {
   try {
     const participant = await findParticipant(req.params.id, req.params.participantId);
     if (!participant) return res.status(404).json({ success: false, message: "Participant not found" });
 
-    const calls = await EventCall.find({ eventParticipantId: participant._id })
-      .sort({ calledAt: -1, _id: -1 })
-      .populate("calledBy", "name")
-      .lean();
+    const rows = await prisma.eventCall.findMany({
+      where: { eventParticipantId: participant.id },
+      orderBy: [{ calledAt: "desc" }, { createdAt: "desc" }],
+      include: { caller: { select: { id: true, name: true } } },
+    });
+    const calls = rows.map(({ caller, ...c }) => ({ ...c, calledBy: caller }));
 
-    res.status(200).json({ success: true, calls, participant });
+    res.status(200).json({ success: true, calls: toApi(calls), participant: toApi(participant) });
   } catch (error) {
     handleError(res, error, "getCalls");
   }
