@@ -83,4 +83,38 @@ const updateAdminStatus = async (req, res) => {
   }
 };
 
-module.exports = { getAdmins, createAdmin, updateAdminStatus };
+// PATCH /api/admins/:id/password   body: { newPassword, confirmPassword }
+const resetAdminPassword = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const newPassword = String(req.body.newPassword || "");
+    const confirmPassword = String(req.body.confirmPassword || "");
+
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: "Invalid admin id" });
+    }
+    if (!newPassword || !confirmPassword) {
+      return res.status(400).json({ success: false, message: "New password and confirm password are required" });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ success: false, message: "Password must be at least 6 characters" });
+    }
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ success: false, message: "Passwords do not match" });
+    }
+
+    const admin = await User.findOneAndUpdate(
+      { _id: id, role: "ADMIN" },
+      { password: await bcrypt.hash(newPassword, 10) },
+    );
+    if (!admin) {
+      return res.status(404).json({ success: false, message: "Admin not found" });
+    }
+
+    res.status(200).json({ success: true, message: "Password reset successfully" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+module.exports = { getAdmins, createAdmin, updateAdminStatus, resetAdminPassword };

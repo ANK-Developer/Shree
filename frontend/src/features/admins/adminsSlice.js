@@ -33,6 +33,18 @@ export const updateAdminStatus = createAsyncThunk(
   },
 );
 
+export const resetAdminPassword = createAsyncThunk(
+  "admins/resetPassword",
+  async ({ id, newPassword, confirmPassword }, { rejectWithValue }) => {
+    try {
+      const { data } = await api.patch(`/admins/${id}/password`, { newPassword, confirmPassword });
+      return data;
+    } catch (err) {
+      return rejectWithValue(errorMessage(err));
+    }
+  },
+);
+
 const adminsSlice = createSlice({
   name: "admins",
   initialState: { list: [], loading: false, saving: false },
@@ -56,6 +68,15 @@ const adminsSlice = createSlice({
         state.list.unshift(payload.admin);
       })
       .addCase(createAdmin.rejected, (state) => {
+        state.saving = false;
+      })
+      .addCase(resetAdminPassword.pending, (state) => {
+        state.saving = true;
+      })
+      .addCase(resetAdminPassword.fulfilled, (state) => {
+        state.saving = false;
+      })
+      .addCase(resetAdminPassword.rejected, (state) => {
         state.saving = false;
       })
       .addCase(updateAdminStatus.fulfilled, (state, { payload }) => {

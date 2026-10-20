@@ -9,11 +9,12 @@ const links = [
   { to: "/admin/admins", label: "Admin", icon: AdminIcon },
 ];
 
-const Sidebar = ({ open }) => (
+// Mobile: screen par fixed drawer (open/close slide). Desktop (md+): page scroll par bhi sticky rehta hai, open=w-64 / closed=w-16
+const Sidebar = ({ open, onNavigate }) => (
   <aside
-    className={`shrink-0 bg-royal-900 text-white transition-all duration-300 ${
-      open ? "w-64" : "w-16"
-    }`}
+    className={`fixed inset-y-0 left-0 z-40 w-64 bg-royal-900 text-white transition-all duration-300 ${
+      open ? "translate-x-0" : "-translate-x-full"
+    } md:sticky md:top-0 md:h-screen md:shrink-0 md:self-start md:translate-x-0 ${open ? "md:w-64" : "md:w-16"}`}
   >
     <div className="h-16 flex items-center justify-center gap-3 border-b border-white/10 font-bold text-lg">
       <img src="/logo.jpeg" alt="Logo" className="h-10 w-10 rounded-full bg-white object-cover ring-2 ring-gold-500" />
@@ -25,6 +26,7 @@ const Sidebar = ({ open }) => (
         <NavLink
           key={to}
           to={to}
+          onClick={onNavigate}
           className={({ isActive }) =>
             `group relative flex items-center gap-3 rounded-lg px-3 py-2.5 transition ${
               open ? "" : "justify-center"

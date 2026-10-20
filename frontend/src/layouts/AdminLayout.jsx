@@ -9,7 +9,13 @@ const AdminLayout = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const user = useSelector((s) => s.auth.user);
-  const [open, setOpen] = useState(true);
+  // Desktop par khula, mobile par band shuru hota hai
+  const [open, setOpen] = useState(() => window.matchMedia("(min-width: 768px)").matches);
+
+  // Mobile drawer me link dabane par drawer band ho jata hai (desktop par sidebar as-is rehta hai)
+  const closeOnMobile = () => {
+    if (!window.matchMedia("(min-width: 768px)").matches) setOpen(false);
+  };
 
   const handleLogout = () => {
     dispatch(logout());
@@ -18,7 +24,10 @@ const AdminLayout = () => {
 
   return (
     <div className="flex min-h-screen bg-royal-50">
-      <Sidebar open={open} />
+      <Sidebar open={open} onNavigate={closeOnMobile} />
+
+      {/* Mobile: drawer ke peeche dim backdrop, uspar tap karne se band */}
+      {open && <div className="fixed inset-0 z-30 bg-black/40 md:hidden" onClick={() => setOpen(false)} aria-hidden="true" />}
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 bg-white shadow-sm px-4 flex items-center justify-between">

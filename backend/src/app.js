@@ -6,6 +6,8 @@ const authRoutes = require("./routes/authRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const memberRoutes = require("./routes/memberRoutes");
 const importantDateRoutes = require("./routes/importantDateRoutes");
+const eventRoutes = require("./routes/eventRoutes");
+const dashboardRoutes = require("./routes/dashboardRoutes");
 
 const app = express();
 
@@ -33,6 +35,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api/admins", adminRoutes);
 app.use("/api/members", memberRoutes);
 app.use("/api/important-dates", importantDateRoutes);
+app.use("/api/events", eventRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 
 // 404 handler
 app.use((req, res) => {
