@@ -1,14 +1,19 @@
-const mongoose = require("mongoose");
+const { PrismaClient } = require("@prisma/client");
+
+// Poore app me ek hi client. Password hash kabhi bhi response me na jaye, isliye default omit; login me explicitly mangwate hain.
+const prisma = new PrismaClient({
+  omit: { user: { password: true } },
+});
 
 const connectDB = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI);
+    await prisma.$connect();
 
-    console.log("MongoDB connected successfully");
+    console.log("MySQL connected successfully");
   } catch (error) {
-    console.error("MongoDB connection failed:", error.message);
+    console.error("MySQL connection failed:", error.message);
     process.exit(1);
   }
 };
 
-module.exports = connectDB;
+module.exports = { prisma, connectDB };

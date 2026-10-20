@@ -1,0 +1,196 @@
+// MySQL schema (pehle Mongoose models the). IDs UUID string hain; API response me "id" ko "_id" bana kar bhejte hain
+// (utils/toApi.js) taaki frontend pehle jaisa chale.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum MemberStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum EventStatus {
+  UPCOMING
+  LIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum ParticipationStatus {
+  ACCEPTED
+  REJECTED
+  NOT_CONFIRMED
+}
+
+enum CallStatus {
+  PENDING
+  ANSWERED
+  NOT_ANSWERED
+  BUSY
+  FAILED
+}
+
+model User {
+  id        String   @id @default(uuid()) @db.Char(36)
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(USER)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  events Event[]     @relation("EventCreator")
+  calls  EventCall[] @relation("CallCaller")
+
+  @@map("users")
+}
+
+model Member {
+  id                String       @id @default(uuid()) @db.Char(36)
+  photoUrl          String       @default("") @db.VarChar(255)
+  name              String
+  fatherHusbandName String
+  surname           String       @default("")
+  // Hindi + English label (allowed values memberController me validate hote hain)
+  memberType        String
+  bloodGroup        String       @default("") @db.VarChar(5)
+  aadharNumber      String       @default("") @db.VarChar(12)
+  occupation        String       @default("")
+  address           String       @default("") @db.Text
+  pincode           String       @default("") @db.VarChar(6)
+  mobileNumber      String       @unique @db.VarChar(10)
+  email             String       @default("")
+  birthDate         DateTime     @db.Date
+  anniversaryDate   DateTime?    @db.Date
+  memberStatus      MemberStatus @default(ACTIVE)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  familyMembers  FamilyMember[]
+  nominees       Nominee[]
+  referrals      Referral[]
+  participations EventParticipant[]
+
+  @@index([memberStatus])
+  @@index([email])
+  @@map("members")
+}
+
+// sortOrder: form me jis order me rows aayi thi, usi order me wapas milti hain
+model FamilyMember {
+  id        String    @id @default(uuid()) @db.Char(36)
+  memberId  String    @db.Char(36)
+  sortOrder Int       @default(0)
+  name      String    @default("")
+  relation  String    @default("")
+  dob       DateTime? @db.Date
+  mobile    String    @default("") @db.VarChar(10)
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([memberId])
+  @@map("family_members")
+}
+
+model Nominee {
+  id        String @id @default(uuid()) @db.Char(36)
+  memberId  String @db.Char(36)
+  sortOrder Int    @default(0)
+  name      String
+  relation  String @default("")
+  mobile    String @db.VarChar(10)
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([memberId])
+  @@map("nominees")
+}
+
+model Referral {
+  id        String @id @default(uuid()) @db.Char(36)
+  memberId  String @db.Char(36)
+  sortOrder Int    @default(0)
+  name      String @default("")
+  mobile    String @default("") @db.VarChar(10)
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([memberId])
+  @@index([mobile]) // "kisne kitno ko refer kiya" lookup ke liye
+  @@map("referrals")
+}
+
+model Event {
+  id            String      @id @default(uuid()) @db.Char(36)
+  eventBanner   String?     @db.VarChar(255)
+  eventName     String      @db.VarChar(150)
+  description   String      @db.Text
+  status        EventStatus @default(UPCOMING)
+  venue         String      @db.VarChar(300)
+  startDateTime DateTime
+  endDateTime   DateTime
+  createdBy     String      @db.Char(36)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  creator      User               @relation("EventCreator", fields: [createdBy], references: [id])
+  participants EventParticipant[]
+
+  @@index([startDateTime])
+  @@index([status])
+  @@map("events")
+}
+
+model EventParticipant {
+  id                  String              @id @default(uuid()) @db.Char(36)
+  eventId             String              @db.Char(36)
+  memberId            String              @db.Char(36)
+  participationStatus ParticipationStatus @default(NOT_CONFIRMED)
+  // Call summary (EventCall se sync rehta hai) taaki list me har row ke liye alag lookup na lage
+  callCount           Int                 @default(0)
+  lastCalledAt        DateTime?
+  lastCallStatus      CallStatus?
+  registeredAt        DateTime            @default(now())
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  event  Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  member Member      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  calls  EventCall[]
+
+  // Same member cannot register twice for the same event.
+  @@unique([eventId, memberId])
+  @@index([eventId, participationStatus])
+  @@index([memberId])
+  @@map("event_participants")
+}
+
+model EventCall {
+  id                 String     @id @default(uuid()) @db.Char(36)
+  eventParticipantId String     @db.Char(36)
+  callStatus         CallStatus @default(PENDING)
+  callResponse       String?    @db.VarChar(1000)
+  calledAt           DateTime   @default(now())
+  calledBy           String?    @db.Char(36)
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  participant EventParticipant @relation(fields: [eventParticipantId], references: [id], onDelete: Cascade)
+  caller      User?            @relation("CallCaller", fields: [calledBy], references: [id], onDelete: SetNull)
+
+  @@index([eventParticipantId, calledAt(sort: Desc)])
+  @@index([calledBy])
+  @@map("event_calls")
+}

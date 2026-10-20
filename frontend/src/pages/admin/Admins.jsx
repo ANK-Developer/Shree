@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
-import { createAdmin, fetchAdmins, updateAdminStatus } from "../../features/admins/adminsSlice";
+import {
+  createAdmin,
+  fetchAdmins,
+  resetAdminPassword,
+  updateAdminStatus,
+} from "../../features/admins/adminsSlice";
 
 const inputClass =
   "w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-royal-500";
@@ -68,12 +73,92 @@ const CreateAdminModal = ({ onClose }) => {
   );
 };
 
+const ResetPasswordModal = ({ admin, onClose }) => {
+  const dispatch = useDispatch();
+  const saving = useSelector((s) => s.admins.saving);
+  const [form, setForm] = useState({ newPassword: "", confirmPassword: "" });
+  const [show, setShow] = useState(false);
+
+  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (form.newPassword !== form.confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
+    try {
+      const res = await dispatch(resetAdminPassword({ id: admin._id, ...form })).unwrap();
+      toast.success(res.message);
+      onClose();
+    } catch (message) {
+      toast.error(message);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 px-4">
+      <form onSubmit={handleSubmit} className="w-full max-w-md bg-white rounded-2xl shadow-xl p-6 space-y-4">
+        <div>
+          <h3 className="text-xl font-bold text-royal-900">Reset Password</h3>
+          <p className="text-sm text-gray-500 mt-1">
+            {admin.name} ({admin.email})
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+          <input
+            type={show ? "text" : "password"}
+            name="newPassword"
+            value={form.newPassword}
+            onChange={handleChange}
+            required
+            minLength={6}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
+          <input
+            type={show ? "text" : "password"}
+            name="confirmPassword"
+            value={form.confirmPassword}
+            onChange={handleChange}
+            required
+            minLength={6}
+            className={inputClass}
+          />
+        </div>
+        <label className="flex items-center gap-2 text-sm text-gray-600">
+          <input type="checkbox" checked={show} onChange={(e) => setShow(e.target.checked)} />
+          Show password
+        </label>
+
+        <div className="flex justify-end gap-3 pt-2">
+          <button type="button" onClick={onClose} className="rounded-lg px-4 py-2 text-gray-600 hover:bg-gray-100">
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={saving}
+            className="rounded-lg bg-royal-600 hover:bg-royal-700 disabled:opacity-60 text-white font-semibold px-4 py-2"
+          >
+            {saving ? "Saving..." : "Save"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+};
+
 const Admins = () => {
   const dispatch = useDispatch();
   const { list, loading } = useSelector((s) => s.admins);
   const currentUser = useSelector((s) => s.auth.user);
   const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);
+  const [resetTarget, setResetTarget] = useState(null);
 
   // Typing ke 400ms baad search API call
   useEffect(() => {
@@ -159,7 +244,13 @@ const Admins = () => {
                         {admin.isActive ? "Active" : "Inactive"}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 space-x-2 whitespace-nowrap">
+                      <button
+                        onClick={() => setResetTarget(admin)}
+                        className="rounded-lg bg-royal-600 hover:bg-royal-700 px-3 py-1.5 text-xs font-semibold text-white transition"
+                      >
+                        Reset Password
+                      </button>
                       <button
                         onClick={() => handleToggle(admin)}
                         disabled={isSelf && admin.isActive}
@@ -180,6 +271,7 @@ const Admins = () => {
       </div>
 
       {showModal && <CreateAdminModal onClose={() => setShowModal(false)} />}
+      {resetTarget && <ResetPasswordModal admin={resetTarget} onClose={() => setResetTarget(null)} />}
     </div>
   );
 };

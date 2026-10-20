@@ -1,8 +1,8 @@
 const bcrypt = require("bcryptjs");
-const User = require("../models/User");
+const { prisma } = require("../config/db");
 const generateToken = require("../utils/generateToken");
 
-const sanitize = (u) => ({ id: u._id, name: u.name, email: u.email, role: u.role });
+const sanitize = (u) => ({ id: u.id, name: u.name, email: u.email, role: u.role });
 
 // POST /api/auth/login  (admin only)
 const login = async (req, res) => {
@@ -13,8 +13,11 @@ const login = async (req, res) => {
       return res.status(400).json({ success: false, message: "Email and password are required" });
     }
 
-    const user = await User.findOne({ email: String(email).toLowerCase().trim() }).select("+password");
-    const valid = user && (await bcrypt.compare(password, user.password));
+    const user = await prisma.user.findUnique({
+      where: { email: String(email).toLowerCase().trim() },
+      omit: { password: false },
+    });
+    const valid = user && (await bcrypt.compare(String(password), user.password));
 
     if (!valid || user.role !== "ADMIN" || !user.isActive) {
       return res.status(401).json({ success: false, message: "Invalid credentials" });
@@ -22,7 +25,7 @@ const login = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      token: generateToken(user._id, user.role),
+      token: generateToken(user.id, user.role),
       user: sanitize(user),
     });
   } catch (error) {
