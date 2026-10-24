@@ -24,7 +24,10 @@ const login = async (req, res) => {
     }
 
     // Admins page par "Last Login" dikhane ke liye
-    await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+    // Last-login fail ho to bhi login na ruke
+    await prisma.user
+      .update({ where: { id: user.id }, data: { lastLoginAt: new Date() } })
+      .catch((err) => console.error("lastLoginAt update failed:", err.message));
 
     res.status(200).json({
       success: true,
