@@ -203,6 +203,13 @@ const MembershipForm = () => {
   };
   const blurRow = (kind, i, key) => setListTouched((t) => ({ ...t, [kind]: { ...t[kind], [`${i}.${key}`]: true } }));
 
+  // Galat photo chuni ho to hata do — bina photo ke bhi form submit ho sakta hai
+  const removePhoto = () => {
+    if (photo) URL.revokeObjectURL(photo);
+    setPhoto(null);
+    setPhotoFile(null);
+  };
+
   const handlePhoto = (e) => {
     const file = e.target.files[0];
     e.target.value = ""; // same file dobara choose karne par bhi onChange chale
@@ -287,6 +294,13 @@ const MembershipForm = () => {
                 </div>
               </label>
             </div>
+            {photo && (
+              <div className="flex justify-center mt-3">
+                <button type="button" onClick={removePhoto} className="rounded-full border border-red-200 bg-red-50 px-4 py-1 text-xs font-semibold text-red-600 hover:bg-red-100">
+                  Remove Photo
+                </button>
+              </div>
+            )}
           </Section>
 
           <Section title="1. व्यक्तिगत जानकारी / Personal Information" icon="👤">

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
 import { toast } from "react-toastify";
 import { createEvent, updateEvent } from "../../features/events/eventsSlice";
@@ -29,6 +29,7 @@ const EventFormModal = ({ event, onClose, onSaved }) => {
 
   const [file, setFile] = useState(null);
   const [removeBanner, setRemoveBanner] = useState(false);
+  const fileInputRef = useRef(null);
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
@@ -48,8 +49,10 @@ const EventFormModal = ({ event, onClose, onSaved }) => {
     setRemoveBanner(false);
   };
 
+  // Naya chuna file hai to sirf use hatao (purana banner wapas dikhega), warna maujooda banner hatao
   const clearBanner = () => {
-    setFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (file) return setFile(null);
     setRemoveBanner(true);
   };
 
@@ -109,7 +112,7 @@ const EventFormModal = ({ event, onClose, onSaved }) => {
           </select>
         </Field>
         <Field label="Banner Image (optional, JPG/PNG/WEBP, max 2MB)">
-          <input type="file" accept="image/jpeg,image/png,image/webp" onChange={pickFile} className="block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-royal-100 file:px-4 file:py-2 file:font-semibold file:text-royal-700 hover:file:bg-royal-200" />
+          <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={pickFile} className="block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-royal-100 file:px-4 file:py-2 file:font-semibold file:text-royal-700 hover:file:bg-royal-200" />
         </Field>
         {shownBanner && (
           <div className="relative">
