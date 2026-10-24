@@ -41,9 +41,9 @@ const Dashboard = () => {
   }, [dispatch]);
 
   const cards = [
-    { label: "Total Members", value: stats.total, color: "text-royal-700 bg-royal-100" },
-    { label: "Active Members", value: stats.active, color: "text-green-700 bg-green-100" },
-    { label: "Inactive Members", value: stats.inactive, color: "text-red-700 bg-red-100" },
+    { label: "Total Members", value: stats.total, color: "text-royal-700 bg-royal-100", to: "/admin/members" },
+    { label: "Active Members", value: stats.active, color: "text-green-700 bg-green-100", to: "/admin/members?status=ACTIVE" },
+    { label: "Inactive Members", value: stats.inactive, color: "text-red-700 bg-red-100", to: "/admin/members?status=INACTIVE" },
   ];
 
   return (
@@ -52,7 +52,7 @@ const Dashboard = () => {
 
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         {cards.map((c) => (
-          <div key={c.label} className="bg-white rounded-2xl shadow p-5 flex items-center justify-between">
+          <Link key={c.label} to={c.to} className="bg-white rounded-2xl shadow p-5 flex items-center justify-between hover:shadow-md transition-shadow focus:outline-none focus:ring-2 focus:ring-royal-500">
             <div>
               <p className="text-sm text-gray-500">{c.label}</p>
               <p className="text-3xl font-bold text-royal-900 mt-1">{loaded ? c.value : "–"}</p>
@@ -60,7 +60,7 @@ const Dashboard = () => {
             <span className={`h-12 w-12 rounded-full grid place-items-center ${c.color}`}>
               <MembersIcon className="w-6 h-6" />
             </span>
-          </div>
+          </Link>
         ))}
       </div>
 
