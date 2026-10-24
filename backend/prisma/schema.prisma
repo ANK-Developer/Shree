@@ -68,7 +68,7 @@ model Member {
   bloodGroup        String       @default("") @db.VarChar(5)
   aadharNumber      String       @default("") @db.VarChar(12)
   occupation        String       @default("")
-  address           String       @default("") @db.Text
+  address           String       @default("") @db.VarChar(500)
   pincode           String       @default("") @db.VarChar(6)
   mobileNumber      String       @unique @db.VarChar(10)
   email             String       @default("")

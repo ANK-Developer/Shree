@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import Avatar from "../../components/admin/Avatar";
 import Pagination from "../../components/admin/Pagination";
@@ -16,10 +16,12 @@ const inputClass = "rounded-lg border border-gray-300 px-3 py-2 focus:outline-no
 const Members = () => {
   const dispatch = useDispatch();
   const { list, pagination, loading, stats, statsLoaded } = useSelector((s) => s.members);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const statusFromUrl = ["ACTIVE", "INACTIVE"].includes(searchParams.get("status")) ? searchParams.get("status") : "";
 
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState(statusFromUrl);
   const [page, setPage] = useState(1);
 
   const load = useCallback(async () => {
@@ -43,6 +45,11 @@ const Members = () => {
   useEffect(() => {
     loadStats();
   }, [loadStats]);
+
+  useEffect(() => {
+    setStatus(statusFromUrl);
+    setPage(1);
+  }, [statusFromUrl]);
 
   // Typing ke 400ms baad hi search hota hai, aur search badalne par page 1 par aate hain
   useEffect(() => {
@@ -90,8 +97,8 @@ const Members = () => {
             <select
               value={status}
               onChange={(e) => {
-                setStatus(e.target.value);
-                setPage(1);
+                const nextStatus = e.target.value;
+                setSearchParams(nextStatus ? { status: nextStatus } : {});
               }}
               className={inputClass}
             >
