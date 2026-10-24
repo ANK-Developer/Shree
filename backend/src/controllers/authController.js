@@ -23,6 +23,9 @@ const login = async (req, res) => {
       return res.status(401).json({ success: false, message: "Invalid credentials" });
     }
 
+    // Admins page par "Last Login" dikhane ke liye
+    await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+
     res.status(200).json({
       success: true,
       token: generateToken(user.id, user.role),

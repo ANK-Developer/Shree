@@ -210,6 +210,7 @@ const Admins = () => {
               <th className="px-4 py-3">Name</th>
               <th className="px-4 py-3">Email</th>
               <th className="px-4 py-3">Created</th>
+              <th className="px-4 py-3">Last Login</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Action</th>
             </tr>
@@ -217,11 +218,11 @@ const Admins = () => {
           <tbody>
             {loading && list.length === 0 ? (
               <tr>
-                <td colSpan="6" className="px-4 py-8 text-center text-gray-500">Loading...</td>
+                <td colSpan="7" className="px-4 py-8 text-center text-gray-500">Loading...</td>
               </tr>
             ) : list.length === 0 ? (
               <tr>
-                <td colSpan="6" className="px-4 py-8 text-center text-gray-500">No admins found</td>
+                <td colSpan="7" className="px-4 py-8 text-center text-gray-500">No admins found</td>
               </tr>
             ) : (
               list.map((admin, i) => {
@@ -235,6 +236,11 @@ const Admins = () => {
                     </td>
                     <td className="px-4 py-3">{admin.email}</td>
                     <td className="px-4 py-3">{new Date(admin.createdAt).toLocaleDateString()}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {admin.lastLoginAt
+                        ? new Date(admin.lastLoginAt).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
+                        : "Never"}
+                    </td>
                     <td className="px-4 py-3">
                       <span
                         className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
