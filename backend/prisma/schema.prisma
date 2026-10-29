@@ -73,7 +73,7 @@ model Member {
   pincode           String       @default("") @db.VarChar(6)
   mobileNumber      String       @unique @db.VarChar(10)
   email             String       @default("")
-  birthDate         DateTime     @db.Date
+  birthDate         DateTime?    @db.Date
   anniversaryDate   DateTime?    @db.Date
   memberStatus      MemberStatus @default(ACTIVE)
   createdAt         DateTime     @default(now())

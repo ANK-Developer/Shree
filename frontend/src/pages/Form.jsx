@@ -48,7 +48,9 @@ const occupations = [
 ];
 
 const memberTypes = [
+  "पैट्रन ट्रस्टी / Patron Trustee",
   "ट्रस्टी / Trustee",
+  "रूम दान / Room Daan",
   "अध्यक्ष / President",
   "उपाध्यक्ष / Vice President",
   "सचिव / Secretary",

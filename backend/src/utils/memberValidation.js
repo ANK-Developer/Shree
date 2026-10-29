@@ -3,7 +3,9 @@
 const RELATIONS = ["", "पिता (Father)", "माता (Mother)", "भाई (Brother)", "बहन (Sister)", "पुत्र (Son)", "पुत्री (Daughter)", "पति (Husband)", "पत्नी (Wife)"];
 
 const MEMBER_TYPES = [
+  "पैट्रन ट्रस्टी / Patron Trustee",
   "ट्रस्टी / Trustee",
+  "रूम दान / Room Daan",
   "अध्यक्ष / President",
   "उपाध्यक्ष / Vice President",
   "सचिव / Secretary",
