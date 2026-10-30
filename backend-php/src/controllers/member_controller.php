@@ -138,8 +138,8 @@ function member_list_response(array $conditions, array $params): never
     json_response(200, ['success' => true, 'members' => to_api($members), 'pagination' => paginate($page, $limit, $total)]);
 }
 
-// GET /api/members?page=&limit=&search=&status=
-function get_members(): void
+// search/status/type query params se [conditions, params] (list aur PDF export dono me same filter)
+function member_filters(): array
 {
     $status = strtoupper(query_param('status'));
     [$searchSql, $params] = member_search_filter(str(query_param('search')));
@@ -154,7 +154,27 @@ function get_members(): void
         $conditions[] = 'm.memberType = ?';
         $params[] = $type;
     }
+    return [$conditions, $params];
+}
+
+// GET /api/members?page=&limit=&search=&status=&type=
+function get_members(): void
+{
+    [$conditions, $params] = member_filters();
     member_list_response($conditions, $params);
+}
+
+// GET /api/members/export?search=&status=&type=  - PDF ke liye table jaisa filter, par pagination ke bina
+function export_members(): void
+{
+    [$conditions, $params] = member_filters();
+    $where = $conditions ? 'WHERE ' . implode(' AND ', $conditions) : '';
+    $members = query(
+        "SELECT m.id, m.photoUrl, m.name, m.fatherHusbandName, m.surname, m.memberType, m.aadharNumber, m.address, m.pincode, m.mobileNumber, m.birthDate, m.memberStatus
+         FROM members m $where ORDER BY m.createdAt DESC",
+        $params
+    )->fetchAll();
+    json_response(200, ['success' => true, 'members' => to_api($members)]);
 }
 
 // Member counts: { total, active, inactive }  (dashboard bhi yahi use karta hai)

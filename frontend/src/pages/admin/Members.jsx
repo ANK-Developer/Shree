@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import Avatar from "../../components/admin/Avatar";
+import MembersPdfButton from "../../components/admin/MembersPdfButton";
 import Pagination from "../../components/admin/Pagination";
 import StatusBadge from "../../components/admin/StatusBadge";
 import { MembersIcon } from "../../components/admin/icons";
@@ -93,6 +94,13 @@ const Members = () => {
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-2xl font-bold text-royal-900">Members</h2>
+        <Link to="/admin/members/new" className="rounded-xl bg-royal-600 hover:bg-royal-700 px-4 py-2.5 text-center text-sm font-semibold text-white whitespace-nowrap transition">
+          + Add Member
+        </Link>
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         {cards.map((c) => (
           <div key={c.label} className="bg-white rounded-2xl shadow p-5 flex items-center justify-between">
@@ -108,9 +116,7 @@ const Members = () => {
       </div>
 
       <div className="bg-white rounded-2xl shadow p-6">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-5">
-          <h2 className="text-2xl font-bold text-royal-900">Members</h2>
-
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-end gap-3 mb-5">
           <div className="flex flex-col sm:flex-row gap-3">
             <input type="search" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Search name or mobile..." className={`${inputClass} w-full sm:w-64`} />
             <select
@@ -158,9 +164,7 @@ const Members = () => {
               placeholder="Rows"
               className={`${inputClass} w-24`}
             />
-            <Link to="/admin/members/new" className="rounded-xl bg-royal-600 hover:bg-royal-700 px-4 py-2.5 text-center text-sm font-semibold text-white whitespace-nowrap transition">
-              + Add Member
-            </Link>
+            <MembersPdfButton filters={{ search, status, type }} total={pagination.total} />
           </div>
         </div>
 
