@@ -1,0 +1,5 @@
+# Uploads folder me PHP kabhi execute na ho
+<IfModule mod_php.c>
+  php_flag engine off
+</IfModule>
+Options -Indexes
