@@ -1,4 +1,9 @@
 # Apache (XAMPP / shared hosting): asli files (uploads) seedhe, baaki sab index.php par
+<IfModule mod_headers.c>
+    <FilesMatch "\.(jpe?g|png|webp)$">
+        Header set Access-Control-Allow-Origin "*"
+    </FilesMatch>
+</IfModule>
 RewriteEngine On
 RewriteCond %{HTTP:Authorization} .
 RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]

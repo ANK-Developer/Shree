@@ -149,6 +149,11 @@ function get_members(): void
         $conditions[] = 'm.memberStatus = ?';
         $params[] = $status;
     }
+    $type = trim(query_param('type'));
+    if (in_array($type, MEMBER_TYPES, true)) {
+        $conditions[] = 'm.memberType = ?';
+        $params[] = $type;
+    }
     member_list_response($conditions, $params);
 }
 

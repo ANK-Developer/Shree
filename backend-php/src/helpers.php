@@ -209,7 +209,7 @@ function page_params(int $defaultLimit = 10): array
 {
     return [
         max(int_param(query_param('page'), 1), 1),
-        min(max(int_param(query_param('limit'), $defaultLimit), 1), 50),
+        min(max(int_param(query_param('limit'), $defaultLimit), 1), 500),
     ];
 }
 

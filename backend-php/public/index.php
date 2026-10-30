@@ -9,6 +9,7 @@ if (PHP_SAPI === 'cli-server') {
     if (str_starts_with($real, realpath(__DIR__ . '/uploads') . DIRECTORY_SEPARATOR) && is_file($real)) {
         $types = ['jpg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp'];
         header('Content-Type: ' . ($types[strtolower(pathinfo($real, PATHINFO_EXTENSION))] ?? 'application/octet-stream'));
+        header('Access-Control-Allow-Origin: *'); // frontend se fetch karke photo download ho sake
         header('Content-Length: ' . filesize($real));
         readfile($real);
         return true;

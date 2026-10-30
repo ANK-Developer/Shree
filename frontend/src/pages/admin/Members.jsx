@@ -10,7 +10,23 @@ import { fetchMembers, fetchMemberStats } from "../../features/members/membersSl
 import useMemberStatusToggle from "../../hooks/useMemberStatusToggle";
 import { fullName } from "../../utils/format";
 
-const LIMIT = 10;
+const MAX_LIMIT = 500;
+const memberTypes = [
+  "पैट्रन ट्रस्टी / Patron Trustee",
+  "ट्रस्टी / Trustee",
+  "रूम दान / Room Daan",
+  "अध्यक्ष / President",
+  "उपाध्यक्ष / Vice President",
+  "सचिव / Secretary",
+  "कोषाध्यक्ष / Treasurer",
+  "सदस्य / Member",
+  "संस्थापक सदस्य / Founder Member",
+  "कार्यकारी सदस्य / Executive Member",
+  "सलाहकार / Advisor",
+  "मानद सदस्य / Honorary Member",
+  "स्वयंसेवक / Volunteer",
+  "अन्य / Other",
+];
 const inputClass = "rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-royal-500";
 
 const Members = () => {
@@ -22,15 +38,18 @@ const Members = () => {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState(statusFromUrl);
+  const [type, setType] = useState("");
+  const [limitInput, setLimitInput] = useState("10");
+  const [limit, setLimit] = useState(10);
   const [page, setPage] = useState(1);
 
   const load = useCallback(async () => {
     try {
-      await dispatch(fetchMembers({ page, limit: LIMIT, search, status })).unwrap();
+      await dispatch(fetchMembers({ page, limit, search, status, type })).unwrap();
     } catch (message) {
       toast.error(message);
     }
-  }, [dispatch, page, search, status]);
+  }, [dispatch, page, limit, search, status, type]);
 
   const loadStats = useCallback(() => {
     dispatch(fetchMemberStats())
@@ -106,6 +125,39 @@ const Members = () => {
               <option value="ACTIVE">Active</option>
               <option value="INACTIVE">Inactive</option>
             </select>
+            <select
+              value={type}
+              onChange={(e) => {
+                setType(e.target.value);
+                setPage(1);
+              }}
+              className={inputClass}
+            >
+              <option value="">All Types</option>
+              {memberTypes.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+            <input
+              type="number"
+              min="1"
+              max={MAX_LIMIT}
+              value={limitInput}
+              onChange={(e) => {
+                setLimitInput(e.target.value);
+                const n = Math.min(parseInt(e.target.value, 10), MAX_LIMIT);
+                if (n >= 1) {
+                  setLimit(n);
+                  setPage(1);
+                }
+              }}
+              onBlur={() => setLimitInput(String(limit))}
+              title="Members per page"
+              placeholder="Rows"
+              className={`${inputClass} w-24`}
+            />
             <Link to="/admin/members/new" className="rounded-xl bg-royal-600 hover:bg-royal-700 px-4 py-2.5 text-center text-sm font-semibold text-white whitespace-nowrap transition">
               + Add Member
             </Link>
