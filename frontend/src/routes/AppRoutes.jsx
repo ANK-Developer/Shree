@@ -16,9 +16,8 @@ import PublicOnlyRoute from "./PublicOnlyRoute";
 const AppRoutes = () => (
   <Routes>
     {/* Public landing page */}
-    <Route path="/home" element={<Home />} />
-    {/* Login nahi hai to ProtectedRoute login page par bhej deta hai */}
-    <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
+    <Route path="/" element={<Home />} />
+    <Route path="/home" element={<Navigate to="/" replace />} />
 
     {/* Admin panel */}
     <Route element={<PublicOnlyRoute />}>
@@ -37,6 +36,7 @@ const AppRoutes = () => (
         <Route path="/admin/admins" element={<Admins />} />
       </Route>
     </Route>
+    {/* /admin: login nahi to ProtectedRoute login par bhejta hai, login hai to dashboard */}
     <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
 
     <Route path="*" element={<Navigate to="/" replace />} />
