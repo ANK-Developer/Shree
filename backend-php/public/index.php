@@ -70,9 +70,8 @@ $routes = [
     ['PATCH', "/api/admins/$ID/status", fn($id) => update_admin_status(require_admin(), $id)],
     ['PATCH', "/api/admins/$ID/password", function ($id) { require_admin(); reset_admin_password($id); }],
 
-    // Public: membership form submit
-    ['POST', '/api/members', fn() => create_member()],
-    // Admin only
+    // Admin only (membership form bhi sirf login ke baad)
+    ['POST', '/api/members', function () { require_admin(); create_member(); }],
     ['GET', '/api/members', function () { require_admin(); get_members(); }],
     ['GET', '/api/members/stats', function () { require_admin(); get_member_stats(); }], // "/:id" se pehle, warna "stats" id samjha jayega
     ['GET', "/api/members/$ID", function ($id) { require_admin(); get_member_by_id($id); }],

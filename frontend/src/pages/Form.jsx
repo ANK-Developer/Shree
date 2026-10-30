@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { Link } from "react-router-dom";
 import { toast } from "react-toastify";
 import { submitMember } from "../features/members/membersSlice";
 
@@ -264,6 +265,9 @@ const MembershipForm = () => {
   return (
     <div id="membership" className="py-8 px-4">
       <div className="max-w-5xl mx-auto">
+        <Link to="/admin/members" className="inline-flex items-center gap-1 mb-4 text-sm font-semibold text-royal-700 hover:text-royal-900">
+          ← Back to Members
+        </Link>
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-royal-700 via-royal-600 to-royal-500 px-6 py-8 mb-8 text-center shadow-lg border-b-4 border-gold-500">
           <div className="absolute -top-10 -left-10 h-32 w-32 rounded-full bg-gold-500/20" />
           <div className="absolute -bottom-12 -right-8 h-40 w-40 rounded-full bg-pink-brand/20" />

@@ -106,6 +106,9 @@ const Members = () => {
               <option value="ACTIVE">Active</option>
               <option value="INACTIVE">Inactive</option>
             </select>
+            <Link to="/admin/members/new" className="rounded-xl bg-royal-600 hover:bg-royal-700 px-4 py-2.5 text-center text-sm font-semibold text-white whitespace-nowrap transition">
+              + Add Member
+            </Link>
           </div>
         </div>
 
