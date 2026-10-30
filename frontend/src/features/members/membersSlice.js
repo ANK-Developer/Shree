@@ -13,6 +13,16 @@ export const submitMember = createAsyncThunk("members/submit", async (formData, 
   }
 });
 
+// Admin edit form (multipart: photo + fields)
+export const updateMember = createAsyncThunk("members/update", async ({ id, formData }, { rejectWithValue }) => {
+  try {
+    const { data } = await api.put(`/members/${id}`, formData);
+    return data;
+  } catch (err) {
+    return rejectWithValue(errorMessage(err));
+  }
+});
+
 // params: { page, limit, search, status }
 export const fetchMembers = createAsyncThunk("members/fetch", async (params, { rejectWithValue }) => {
   try {
@@ -92,6 +102,16 @@ const membersSlice = createSlice({
         state.submitting = false;
       })
       .addCase(submitMember.rejected, (state) => {
+        state.submitting = false;
+      })
+
+      .addCase(updateMember.pending, (state) => {
+        state.submitting = true;
+      })
+      .addCase(updateMember.fulfilled, (state) => {
+        state.submitting = false;
+      })
+      .addCase(updateMember.rejected, (state) => {
         state.submitting = false;
       })
 

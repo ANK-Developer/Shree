@@ -9,6 +9,7 @@ if (PHP_SAPI === 'cli-server') {
     if (str_starts_with($real, realpath(__DIR__ . '/uploads') . DIRECTORY_SEPARATOR) && is_file($real)) {
         $types = ['jpg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp'];
         header('Content-Type: ' . ($types[strtolower(pathinfo($real, PATHINFO_EXTENSION))] ?? 'application/octet-stream'));
+        header('Access-Control-Allow-Origin: *'); // frontend se fetch karke photo download ho sake
         header('Content-Length: ' . filesize($real));
         readfile($real);
         return true;
@@ -70,13 +71,14 @@ $routes = [
     ['PATCH', "/api/admins/$ID/status", fn($id) => update_admin_status(require_admin(), $id)],
     ['PATCH', "/api/admins/$ID/password", function ($id) { require_admin(); reset_admin_password($id); }],
 
-    // Public: membership form submit
-    ['POST', '/api/members', fn() => create_member()],
-    // Admin only
+    // Admin only (membership form bhi sirf login ke baad)
+    ['POST', '/api/members', function () { require_admin(); create_member(); }],
     ['GET', '/api/members', function () { require_admin(); get_members(); }],
     ['GET', '/api/members/stats', function () { require_admin(); get_member_stats(); }], // "/:id" se pehle, warna "stats" id samjha jayega
+    ['GET', '/api/members/export', function () { require_admin(); export_members(); }],
     ['GET', "/api/members/$ID", function ($id) { require_admin(); get_member_by_id($id); }],
     ['GET', "/api/members/$ID/referred", function ($id) { require_admin(); get_referred_members($id); }],
+    ['PUT', "/api/members/$ID", function ($id) { require_admin(); update_member($id); }],
     ['PATCH', "/api/members/$ID/status", function ($id) { require_admin(); update_member_status($id); }],
 
     ['GET', '/api/important-dates', function () { require_admin(); get_important_dates(); }],

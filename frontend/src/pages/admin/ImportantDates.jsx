@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { Link } from "react-router-dom";
 import { toast } from "react-toastify";
 import Avatar from "../../components/admin/Avatar";
+import PhotoModal from "../../components/admin/PhotoModal";
 import Pagination from "../../components/admin/Pagination";
 import StatusBadge from "../../components/admin/StatusBadge";
 import { fetchImportantDates } from "../../features/importantDates/importantDatesSlice";
@@ -34,6 +35,7 @@ const ImportantDates = () => {
   const dispatch = useDispatch();
   const { list, pagination, loading } = useSelector((s) => s.importantDates);
 
+  const [photoMember, setPhotoMember] = useState(null);
   const [range, setRange] = useState("today"); // default: aaj
   const [type, setType] = useState("");
   const [status, setStatus] = useState("");
@@ -145,7 +147,13 @@ const ImportantDates = () => {
                   <td className="px-4 py-3">{(pagination.page - 1) * pagination.limit + i + 1}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <Avatar member={d} />
+                      {d.photoUrl ? (
+                        <button type="button" onClick={() => setPhotoMember(d)} className="rounded-full cursor-zoom-in">
+                          <Avatar member={d} />
+                        </button>
+                      ) : (
+                        <Avatar member={d} />
+                      )}
                       <span className="font-medium">{fullName(d)}</span>
                     </div>
                   </td>
@@ -181,6 +189,7 @@ const ImportantDates = () => {
       </div>
 
       <Pagination {...pagination} onChange={setPage} />
+      {photoMember && <PhotoModal member={photoMember} onClose={() => setPhotoMember(null)} />}
     </div>
   );
 };

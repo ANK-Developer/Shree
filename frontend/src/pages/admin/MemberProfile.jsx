@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import Avatar from "../../components/admin/Avatar";
 import ReferredMembersTab from "../../components/admin/ReferredMembersTab";
@@ -115,14 +115,19 @@ const MemberProfile = () => {
               <span className="text-sm text-gray-400">Registered on {formatDate(m.createdAt)}</span>
             </div>
           </div>
-          <button
-            onClick={() => requestToggle(m)}
-            className={`rounded-lg px-4 py-2 font-semibold text-white transition ${
-              active ? "bg-red-500 hover:bg-red-600" : "bg-leaf hover:opacity-90"
-            }`}
-          >
-            {active ? "Deactivate" : "Activate"}
-          </button>
+          <div className="flex items-center gap-2">
+            <Link to={`/admin/members/${m._id}/edit`} className="rounded-lg bg-gold-500 hover:bg-gold-600 px-4 py-2 font-semibold text-royal-900 transition">
+              Edit
+            </Link>
+            <button
+              onClick={() => requestToggle(m)}
+              className={`rounded-lg px-4 py-2 font-semibold text-white transition ${
+                active ? "bg-red-500 hover:bg-red-600" : "bg-leaf hover:opacity-90"
+              }`}
+            >
+              {active ? "Deactivate" : "Activate"}
+            </button>
+          </div>
         </div>
       </div>
 

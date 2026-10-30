@@ -138,8 +138,8 @@ function member_list_response(array $conditions, array $params): never
     json_response(200, ['success' => true, 'members' => to_api($members), 'pagination' => paginate($page, $limit, $total)]);
 }
 
-// GET /api/members?page=&limit=&search=&status=
-function get_members(): void
+// search/status/type query params se [conditions, params] (list aur PDF export dono me same filter)
+function member_filters(): array
 {
     $status = strtoupper(query_param('status'));
     [$searchSql, $params] = member_search_filter(str(query_param('search')));
@@ -149,7 +149,32 @@ function get_members(): void
         $conditions[] = 'm.memberStatus = ?';
         $params[] = $status;
     }
+    $type = trim(query_param('type'));
+    if (in_array($type, MEMBER_TYPES, true)) {
+        $conditions[] = 'm.memberType = ?';
+        $params[] = $type;
+    }
+    return [$conditions, $params];
+}
+
+// GET /api/members?page=&limit=&search=&status=&type=
+function get_members(): void
+{
+    [$conditions, $params] = member_filters();
     member_list_response($conditions, $params);
+}
+
+// GET /api/members/export?search=&status=&type=  - PDF ke liye table jaisa filter, par pagination ke bina
+function export_members(): void
+{
+    [$conditions, $params] = member_filters();
+    $where = $conditions ? 'WHERE ' . implode(' AND ', $conditions) : '';
+    $members = query(
+        "SELECT m.id, m.photoUrl, m.name, m.fatherHusbandName, m.surname, m.memberType, m.aadharNumber, m.address, m.pincode, m.mobileNumber, m.birthDate, m.memberStatus
+         FROM members m $where ORDER BY m.createdAt DESC",
+        $params
+    )->fetchAll();
+    json_response(200, ['success' => true, 'members' => to_api($members)]);
 }
 
 // Member counts: { total, active, inactive }  (dashboard bhi yahi use karta hai)
@@ -220,4 +245,90 @@ function update_member_status(string $id): void
         'message' => 'Member ' . ($memberStatus === 'ACTIVE' ? 'activated' : 'deactivated') . ' successfully',
         'member' => to_api(find_member_full($id)),
     ]);
+}
+
+// PUT /api/members/:id  (multipart: create jaisi fields + optional photo; removePhoto=true se photo hata sakte hain)
+function update_member(string $id): void
+{
+    $newPhoto = handle_image_upload('members', 'photo', 'Photo');
+    try {
+        $existing = is_valid_id($id) ? (query('SELECT * FROM members WHERE id = ?', [$id])->fetch() ?: null) : null;
+        if (!$existing) {
+            remove_uploaded_file($newPhoto);
+            fail(404, 'Member not found');
+        }
+
+        $familyMembers = parse_list(input('familyMembers'));
+        $nominees = parse_list(input('nominees'));
+        $referrals = parse_list(input('referrals'));
+        if ($familyMembers === null || $nominees === null || $referrals === null) {
+            remove_uploaded_file($newPhoto);
+            fail(400, 'Invalid family, nominee or referral data');
+        }
+
+        $oldPhoto = $existing['photoUrl'];
+        $photoUrl = $newPhoto ?? (input('removePhoto') === 'true' ? '' : $oldPhoto);
+
+        $data = [];
+        foreach (PERSONAL_FIELDS as $key) $data[$key] = input($key);
+        $data['anniversaryDate'] = input('anniversaryDate') ?: null;
+        $data['familyMembers'] = array_values(array_filter($familyMembers, fn($r) => !is_blank_row($r)));
+        $data['nominees'] = array_values(array_filter($nominees, fn($r) => !is_blank_row($r)));
+        $data['referrals'] = array_values(array_filter($referrals, fn($r) => !is_blank_row($r)));
+        $data['photoUrl'] = $photoUrl;
+
+        [$errors, $member, $family, $noms, $refs] = validate_member($data, true);
+        if ($errors) {
+            remove_uploaded_file($newPhoto);
+            fail(400, implode(', ', $errors));
+        }
+
+        // Mobile number kisi doosre member ka na ho (khud ka same number rakhna theek hai)
+        if (query('SELECT id FROM members WHERE mobileNumber = ? AND id <> ?', [$member['mobileNumber'], $id])->fetch()) {
+            remove_uploaded_file($newPhoto);
+            fail(409, 'This mobile number is already registered');
+        }
+
+        $pdo = db();
+        $pdo->beginTransaction();
+        try {
+            query(
+                'UPDATE members SET photoUrl = ?, name = ?, fatherHusbandName = ?, surname = ?, memberType = ?, bloodGroup = ?, aadharNumber = ?,
+                    occupation = ?, address = ?, pincode = ?, mobileNumber = ?, email = ?, birthDate = ?, anniversaryDate = ?, updatedAt = ? WHERE id = ?',
+                [
+                    $member['photoUrl'], $member['name'], $member['fatherHusbandName'], $member['surname'], $member['memberType'],
+                    $member['bloodGroup'], $member['aadharNumber'], $member['occupation'], $member['address'], $member['pincode'],
+                    $member['mobileNumber'], $member['email'], $member['birthDate'], $member['anniversaryDate'], db_datetime(now_utc()), $id,
+                ]
+            );
+            // Child rows form ke naye order me dobara likhe jate hain
+            foreach (['family_members', 'nominees', 'referrals'] as $table) query("DELETE FROM $table WHERE memberId = ?", [$id]);
+            foreach ($family as $r) {
+                query('INSERT INTO family_members (id, memberId, sortOrder, name, relation, dob, mobile) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                    [uuid4(), $id, $r['sortOrder'], $r['name'], $r['relation'], $r['dob'], $r['mobile']]);
+            }
+            foreach ($noms as $r) {
+                query('INSERT INTO nominees (id, memberId, sortOrder, name, relation, mobile) VALUES (?, ?, ?, ?, ?, ?)',
+                    [uuid4(), $id, $r['sortOrder'], $r['name'], $r['relation'], $r['mobile']]);
+            }
+            foreach ($refs as $r) {
+                query('INSERT INTO referrals (id, memberId, sortOrder, name, mobile) VALUES (?, ?, ?, ?, ?)',
+                    [uuid4(), $id, $r['sortOrder'], $r['name'], $r['mobile']]);
+            }
+            $pdo->commit();
+        } catch (Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+
+        // Purani photo tabhi hatate hain jab DB update successful ho chuka ho
+        if ($oldPhoto && $oldPhoto !== $photoUrl) remove_uploaded_file($oldPhoto);
+
+        json_response(200, ['success' => true, 'message' => 'Member updated successfully', 'member' => to_api(find_member_full($id))]);
+    } catch (Throwable $e) {
+        remove_uploaded_file($newPhoto);
+        if (is_duplicate_error($e)) fail(409, 'This mobile number is already registered');
+        error_log('updateMember failed: ' . $e->getMessage());
+        fail(500, 'Server error');
+    }
 }

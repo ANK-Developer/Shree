@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-import PublicLayout from "../layouts/PublicLayout";
+import Home from "../pages/Home";
 import MembershipForm from "../pages/Form";
 import Login from "../pages/admin/Login";
 import AdminLayout from "../layouts/AdminLayout";
@@ -15,10 +15,9 @@ import PublicOnlyRoute from "./PublicOnlyRoute";
 
 const AppRoutes = () => (
   <Routes>
-    {/* Public website */}
-    <Route element={<PublicLayout />}>
-      <Route path="/" element={<MembershipForm />} />
-    </Route>
+    {/* Public landing page */}
+    <Route path="/" element={<Home />} />
+    <Route path="/home" element={<Navigate to="/" replace />} />
 
     {/* Admin panel */}
     <Route element={<PublicOnlyRoute />}>
@@ -29,12 +28,15 @@ const AppRoutes = () => (
         <Route path="/admin/dashboard" element={<Dashboard />} />
         <Route path="/admin/important-dates" element={<ImportantDates />} />
         <Route path="/admin/members" element={<Members />} />
+        <Route path="/admin/members/new" element={<MembershipForm />} />
+        <Route path="/admin/members/:id/edit" element={<MembershipForm />} />
         <Route path="/admin/members/:id" element={<MemberProfile />} />
         <Route path="/admin/events" element={<Events />} />
         <Route path="/admin/events/:id" element={<EventDetail />} />
         <Route path="/admin/admins" element={<Admins />} />
       </Route>
     </Route>
+    {/* /admin: login nahi to ProtectedRoute login par bhejta hai, login hai to dashboard */}
     <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
 
     <Route path="*" element={<Navigate to="/" replace />} />

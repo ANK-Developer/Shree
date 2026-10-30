@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import Avatar from "../../components/admin/Avatar";
+import MembersPdfButton from "../../components/admin/MembersPdfButton";
 import Pagination from "../../components/admin/Pagination";
 import StatusBadge from "../../components/admin/StatusBadge";
 import { MembersIcon } from "../../components/admin/icons";
@@ -10,8 +11,24 @@ import { fetchMembers, fetchMemberStats } from "../../features/members/membersSl
 import useMemberStatusToggle from "../../hooks/useMemberStatusToggle";
 import { fullName } from "../../utils/format";
 
-const LIMIT = 10;
-const inputClass = "rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-royal-500";
+const MAX_LIMIT = 500;
+const memberTypes = [
+  "पैट्रन ट्रस्टी / Patron Trustee",
+  "ट्रस्टी / Trustee",
+  "रूम दान / Room Daan",
+  "अध्यक्ष / President",
+  "उपाध्यक्ष / Vice President",
+  "सचिव / Secretary",
+  "कोषाध्यक्ष / Treasurer",
+  "सदस्य / Member",
+  "संस्थापक सदस्य / Founder Member",
+  "कार्यकारी सदस्य / Executive Member",
+  "सलाहकार / Advisor",
+  "मानद सदस्य / Honorary Member",
+  "स्वयंसेवक / Volunteer",
+  "अन्य / Other",
+];
+const inputClass = "rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-royal-500";
 
 const Members = () => {
   const dispatch = useDispatch();
@@ -22,15 +39,18 @@ const Members = () => {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState(statusFromUrl);
+  const [type, setType] = useState("");
+  const [limitInput, setLimitInput] = useState("10");
+  const [limit, setLimit] = useState(10);
   const [page, setPage] = useState(1);
 
   const load = useCallback(async () => {
     try {
-      await dispatch(fetchMembers({ page, limit: LIMIT, search, status })).unwrap();
+      await dispatch(fetchMembers({ page, limit, search, status, type })).unwrap();
     } catch (message) {
       toast.error(message);
     }
-  }, [dispatch, page, search, status]);
+  }, [dispatch, page, limit, search, status, type]);
 
   const loadStats = useCallback(() => {
     dispatch(fetchMemberStats())
@@ -74,6 +94,13 @@ const Members = () => {
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-2xl font-bold text-royal-900">Members</h2>
+        <Link to="/admin/members/new" className="rounded-xl bg-royal-600 hover:bg-royal-700 px-4 py-2.5 text-center text-sm font-semibold text-white whitespace-nowrap transition">
+          + Add Member
+        </Link>
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         {cards.map((c) => (
           <div key={c.label} className="bg-white rounded-2xl shadow p-5 flex items-center justify-between">
@@ -89,28 +116,66 @@ const Members = () => {
       </div>
 
       <div className="bg-white rounded-2xl shadow p-6">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-5">
-          <h2 className="text-2xl font-bold text-royal-900">Members</h2>
-
-          <div className="flex flex-col sm:flex-row gap-3">
-            <input type="search" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Search name or mobile..." className={`${inputClass} w-full sm:w-64`} />
+        <div className="flex flex-col gap-4 mb-5">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-semibold text-royal-900">Member List</h3>
+              <p className="text-sm text-gray-500">{pagination.total ?? 0} member{pagination.total === 1 ? "" : "s"} found</p>
+            </div>
+            <input type="search" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Search name or mobile..." className={`${inputClass} w-full sm:w-80`} />
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-[10rem_minmax(0,1fr)_6rem_auto] gap-3 rounded-xl bg-gray-50 border border-gray-100 p-3">
             <select
               value={status}
               onChange={(e) => {
                 const nextStatus = e.target.value;
                 setSearchParams(nextStatus ? { status: nextStatus } : {});
               }}
-              className={inputClass}
+              className={`${inputClass} col-span-2 sm:col-span-1`}
             >
               <option value="">All Status</option>
               <option value="ACTIVE">Active</option>
               <option value="INACTIVE">Inactive</option>
             </select>
+            <select
+              value={type}
+              onChange={(e) => {
+                setType(e.target.value);
+                setPage(1);
+              }}
+              className={`${inputClass} min-w-0 col-span-2 sm:col-span-1`}
+            >
+              <option value="">All Types</option>
+              {memberTypes.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+            <input
+              type="number"
+              min="1"
+              max={MAX_LIMIT}
+              value={limitInput}
+              onChange={(e) => {
+                setLimitInput(e.target.value);
+                const n = Math.min(parseInt(e.target.value, 10), MAX_LIMIT);
+                if (n >= 1) {
+                  setLimit(n);
+                  setPage(1);
+                }
+              }}
+              onBlur={() => setLimitInput(String(limit))}
+              title="Members per page"
+              placeholder="Rows"
+              className={`${inputClass} w-full`}
+            />
+            <MembersPdfButton filters={{ search, status, type }} total={pagination.total} />
           </div>
         </div>
 
         <div className={`overflow-x-auto transition-opacity ${loading && list.length ? "opacity-60" : ""}`}>
-          <table className="w-full text-left text-sm">
+          <table className="w-full min-w-190 text-left text-sm whitespace-nowrap">
             <thead className="bg-royal-100 text-royal-900">
               <tr>
                 <th className="px-4 py-3">SR No</th>
@@ -155,6 +220,9 @@ const Members = () => {
                         <div className="flex items-center gap-2">
                           <Link to={`/admin/members/${m._id}`} className="rounded-lg bg-royal-600 hover:bg-royal-700 px-3 py-1.5 text-xs font-semibold text-white transition">
                             View
+                          </Link>
+                          <Link to={`/admin/members/${m._id}/edit`} className="rounded-lg bg-gold-500 hover:bg-gold-600 px-3 py-1.5 text-xs font-semibold text-royal-900 transition">
+                            Edit
                           </Link>
                           <button onClick={() => requestToggle(m)} className={`rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition ${active ? "bg-red-500 hover:bg-red-600" : "bg-leaf hover:opacity-90"}`}>
                             {active ? "Deactivate" : "Activate"}

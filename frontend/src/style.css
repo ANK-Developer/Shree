@@ -14,6 +14,15 @@
   --color-leaf: #2e9e4f;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
+/* sticky navbar ke neeche section ka title na chhupe */
+section[id] {
+  scroll-margin-top: 5rem;
+}
+
 body {
   font-family: "Segoe UI", "Noto Sans Devanagari", system-ui, sans-serif;
 }
