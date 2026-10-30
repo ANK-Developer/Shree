@@ -28,7 +28,7 @@ const memberTypes = [
   "स्वयंसेवक / Volunteer",
   "अन्य / Other",
 ];
-const inputClass = "rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-royal-500";
+const inputClass = "rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-royal-500";
 
 const Members = () => {
   const dispatch = useDispatch();
@@ -116,16 +116,22 @@ const Members = () => {
       </div>
 
       <div className="bg-white rounded-2xl shadow p-6">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-end gap-3 mb-5">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <input type="search" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Search name or mobile..." className={`${inputClass} w-full sm:w-64`} />
+        <div className="flex flex-col gap-4 mb-5">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-semibold text-royal-900">Member List</h3>
+              <p className="text-sm text-gray-500">{pagination.total ?? 0} member{pagination.total === 1 ? "" : "s"} found</p>
+            </div>
+            <input type="search" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Search name or mobile..." className={`${inputClass} w-full sm:w-80`} />
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-[10rem_minmax(0,1fr)_6rem_auto] gap-3 rounded-xl bg-gray-50 border border-gray-100 p-3">
             <select
               value={status}
               onChange={(e) => {
                 const nextStatus = e.target.value;
                 setSearchParams(nextStatus ? { status: nextStatus } : {});
               }}
-              className={inputClass}
+              className={`${inputClass} col-span-2 sm:col-span-1`}
             >
               <option value="">All Status</option>
               <option value="ACTIVE">Active</option>
@@ -137,7 +143,7 @@ const Members = () => {
                 setType(e.target.value);
                 setPage(1);
               }}
-              className={inputClass}
+              className={`${inputClass} min-w-0 col-span-2 sm:col-span-1`}
             >
               <option value="">All Types</option>
               {memberTypes.map((t) => (
@@ -162,14 +168,14 @@ const Members = () => {
               onBlur={() => setLimitInput(String(limit))}
               title="Members per page"
               placeholder="Rows"
-              className={`${inputClass} w-24`}
+              className={`${inputClass} w-full`}
             />
             <MembersPdfButton filters={{ search, status, type }} total={pagination.total} />
           </div>
         </div>
 
         <div className={`overflow-x-auto transition-opacity ${loading && list.length ? "opacity-60" : ""}`}>
-          <table className="w-full text-left text-sm">
+          <table className="w-full min-w-190 text-left text-sm whitespace-nowrap">
             <thead className="bg-royal-100 text-royal-900">
               <tr>
                 <th className="px-4 py-3">SR No</th>

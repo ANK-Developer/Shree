@@ -29,7 +29,7 @@ const MembersPdfButton = ({ filters, total }) => {
 
   return (
     <>
-      <button onClick={() => setOpen(true)} className="rounded-xl bg-gold-500 hover:bg-gold-600 px-4 py-2.5 text-sm font-semibold text-royal-900 whitespace-nowrap transition">
+      <button onClick={() => setOpen(true)} className="w-full rounded-xl bg-gold-500 hover:bg-gold-600 px-4 py-2.5 text-sm font-semibold text-royal-900 whitespace-nowrap transition">
         Download PDF
       </button>
       {open && (
