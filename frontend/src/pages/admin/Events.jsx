@@ -8,7 +8,7 @@ import Pagination from "../../components/admin/Pagination";
 import { EVENT_STATUS, formatDateTime, inputClass } from "../../components/admin/eventUi";
 import { fetchEvents, updateEventStatus } from "../../features/events/eventsSlice";
 
-const LIMIT = 10;
+const MAX_LIMIT = 500;
 
 const Events = () => {
   const dispatch = useDispatch();
@@ -18,6 +18,8 @@ const Events = () => {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
+  const [limitInput, setLimitInput] = useState("10");
+  const [limit, setLimit] = useState(10);
   const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null); // edit hone wala event
@@ -26,11 +28,11 @@ const Events = () => {
 
   const load = useCallback(async () => {
     try {
-      await dispatch(fetchEvents({ page, limit: LIMIT, search, status })).unwrap();
+      await dispatch(fetchEvents({ page, limit, search, status })).unwrap();
     } catch (message) {
       toast.error(message);
     }
-  }, [dispatch, page, search, status]);
+  }, [dispatch, page, limit, search, status]);
 
   useEffect(() => {
     load();
@@ -79,6 +81,24 @@ const Events = () => {
               </option>
             ))}
           </select>
+          <input
+            type="number"
+            min="1"
+            max={MAX_LIMIT}
+            value={limitInput}
+            onChange={(e) => {
+              setLimitInput(e.target.value);
+              const n = Math.min(parseInt(e.target.value, 10), MAX_LIMIT);
+              if (n >= 1) {
+                setLimit(n);
+                setPage(1);
+              }
+            }}
+            onBlur={() => setLimitInput(String(limit))}
+            title="Events per page"
+            placeholder="Rows"
+            className={`${inputClass} w-24`}
+          />
           <button onClick={() => setShowForm(true)} className="rounded-lg bg-royal-600 hover:bg-royal-700 px-4 py-2 font-semibold text-white whitespace-nowrap">
             + Create Event
           </button>
