@@ -44,7 +44,8 @@ function field(mixed $row, string $key): mixed
 
 // data: controller se aaya raw array (personal fields + anniversaryDate, familyMembers, nominees, referrals)
 // return: [errors, member, familyMembers, nominees, referrals] (sab trimmed / cleaned)
-function validate_member(array $data): array
+// $isEdit: purane (sheet se aaye) members me birth date / nominee khaali ho sakte hain, isliye edit me wo zaroori nahi
+function validate_member(array $data, bool $isEdit = false): array
 {
     $errors = [];
 
@@ -75,7 +76,7 @@ function validate_member(array $data): array
     if ($member['email'] !== '' && !preg_match(EMAIL_RE, $member['email'])) $errors[] = 'Please enter a valid email address';
 
     $member['birthDate'] = to_db_date($data['birthDate'] ?? null, 'Birth date', $errors);
-    if (str($data['birthDate'] ?? null) === '') $errors[] = 'Birth date is required';
+    if (!$isEdit && str($data['birthDate'] ?? null) === '') $errors[] = 'Birth date is required';
     $member['anniversaryDate'] = to_db_date($data['anniversaryDate'] ?? null, 'Anniversary date', $errors);
 
     $familyMembers = [];
@@ -87,14 +88,15 @@ function validate_member(array $data): array
         $familyMembers[] = $row;
     }
 
-    if (count($data['nominees']) < 1) $errors[] = 'At least one nominee is required';
+    if (!$isEdit && count($data['nominees']) < 1) $errors[] = 'At least one nominee is required';
     $nominees = [];
     foreach (array_values($data['nominees']) as $sortOrder => $r) {
         $row = ['sortOrder' => $sortOrder, 'name' => str(field($r, 'name')), 'relation' => str(field($r, 'relation')), 'mobile' => str(field($r, 'mobile'))];
         if ($row['name'] === '') $errors[] = 'Nominee name is required';
         if (!in_array($row['relation'], RELATIONS, true)) $errors[] = 'Invalid nominee relation';
-        if ($row['mobile'] === '') $errors[] = 'Nominee mobile is required';
-        elseif (!preg_match(MOBILE_RE, $row['mobile'])) $errors[] = 'Nominee mobile must be 10 digits';
+        if ($row['mobile'] === '') {
+            if (!$isEdit) $errors[] = 'Nominee mobile is required';
+        } elseif (!preg_match(MOBILE_RE, $row['mobile'])) $errors[] = 'Nominee mobile must be 10 digits';
         $nominees[] = $row;
     }
 

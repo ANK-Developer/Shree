@@ -159,6 +159,9 @@ const Members = () => {
                           <Link to={`/admin/members/${m._id}`} className="rounded-lg bg-royal-600 hover:bg-royal-700 px-3 py-1.5 text-xs font-semibold text-white transition">
                             View
                           </Link>
+                          <Link to={`/admin/members/${m._id}/edit`} className="rounded-lg bg-gold-500 hover:bg-gold-600 px-3 py-1.5 text-xs font-semibold text-royal-900 transition">
+                            Edit
+                          </Link>
                           <button onClick={() => requestToggle(m)} className={`rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition ${active ? "bg-red-500 hover:bg-red-600" : "bg-leaf hover:opacity-90"}`}>
                             {active ? "Deactivate" : "Activate"}
                           </button>

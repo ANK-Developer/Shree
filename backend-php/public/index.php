@@ -76,6 +76,7 @@ $routes = [
     ['GET', '/api/members/stats', function () { require_admin(); get_member_stats(); }], // "/:id" se pehle, warna "stats" id samjha jayega
     ['GET', "/api/members/$ID", function ($id) { require_admin(); get_member_by_id($id); }],
     ['GET', "/api/members/$ID/referred", function ($id) { require_admin(); get_referred_members($id); }],
+    ['PUT', "/api/members/$ID", function ($id) { require_admin(); update_member($id); }],
     ['PATCH', "/api/members/$ID/status", function ($id) { require_admin(); update_member_status($id); }],
 
     ['GET', '/api/important-dates', function () { require_admin(); get_important_dates(); }],

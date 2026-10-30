@@ -30,6 +30,7 @@ const AppRoutes = () => (
         <Route path="/admin/important-dates" element={<ImportantDates />} />
         <Route path="/admin/members" element={<Members />} />
         <Route path="/admin/members/new" element={<MembershipForm />} />
+        <Route path="/admin/members/:id/edit" element={<MembershipForm />} />
         <Route path="/admin/members/:id" element={<MemberProfile />} />
         <Route path="/admin/events" element={<Events />} />
         <Route path="/admin/events/:id" element={<EventDetail />} />

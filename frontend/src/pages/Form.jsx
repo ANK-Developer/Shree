@@ -1,8 +1,9 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
-import { submitMember } from "../features/members/membersSlice";
+import { fetchMember, submitMember, updateMember as saveMember } from "../features/members/membersSlice";
+import { FILE_BASE_URL } from "../services/api";
 
 const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const PHOTO_MAX_SIZE = 2 * 1024 * 1024; // backend limit ke saath same
@@ -155,6 +156,13 @@ const RepeatSection = ({ title, icon, itemLabel, addLabel, rows, showRelation, s
 );
 
 const MembershipForm = () => {
+  // /admin/members/:id/edit par id aati hai: wahi form edit mode me chalta hai
+  const { id } = useParams();
+  const isEdit = Boolean(id);
+  const navigate = useNavigate();
+  const [loadingMember, setLoadingMember] = useState(isEdit);
+  const [existingPhoto, setExistingPhoto] = useState(""); // server par saved photo ka path
+  const [photoRemoved, setPhotoRemoved] = useState(false);
   const [form, setForm] = useState(initialForm);
   const [members, setMembers] = useState([{ ...emptyMember }]);
   const [nominees, setNominees] = useState([{ ...emptyNominee }]);
@@ -167,20 +175,44 @@ const MembershipForm = () => {
   const [touched, setTouched] = useState({});
   const [success, setSuccess] = useState(false);
 
+  useEffect(() => {
+    if (!isEdit) return;
+    dispatch(fetchMember(id))
+      .unwrap()
+      .then((m) => {
+        const next = { ...initialForm };
+        Object.keys(initialForm).forEach((k) => {
+          next[k] = String(m[k] ?? "");
+        });
+        next.birthDate = next.birthDate.slice(0, 10);
+        next.anniversaryDate = next.anniversaryDate.slice(0, 10);
+        setForm(next);
+        setMembers(m.familyMembers.length ? m.familyMembers.map((r) => ({ name: r.name, relation: r.relation, dob: (r.dob || "").slice(0, 10), mobile: r.mobile })) : [{ ...emptyMember }]);
+        setNominees(m.nominees.length ? m.nominees.map((r) => ({ name: r.name, relation: r.relation, mobile: r.mobile })) : [{ ...emptyNominee }]);
+        setReferrals(m.referrals.length ? m.referrals.map((r) => ({ name: r.name, mobile: r.mobile })) : [{ ...emptyReferral }]);
+        setExistingPhoto(m.photoUrl || "");
+        setLoadingMember(false);
+      })
+      .catch((message) => {
+        toast.error(message);
+        navigate("/admin/members", { replace: true });
+      });
+  }, [id, isEdit, dispatch, navigate]);
+
   const errors = useMemo(() => {
     const e = {};
     if (!form.name.trim()) e.name = "नाम आवश्यक है / Name is required";
     if (!form.fatherHusbandName.trim()) e.fatherHusbandName = "यह जानकारी आवश्यक है / Required";
     if (!form.memberType) e.memberType = "प्रकार चुनें / Select type";
     if (form.mobileNumber.length !== 10) e.mobileNumber = "10 अंक का मोबाइल नंबर दें / Enter 10-digit mobile number";
-    if (!form.birthDate) e.birthDate = "जन्म तिथि आवश्यक है / Date of birth is required";
+    if (!isEdit && !form.birthDate) e.birthDate = "जन्म तिथि आवश्यक है / Date of birth is required";
     if (form.aadharNumber && form.aadharNumber.length !== 12) e.aadharNumber = "12 अंक होने चाहिए / Must be 12 digits";
     if (form.pincode && form.pincode.length !== 6) e.pincode = "6 अंक होने चाहिए / Must be 6 digits";
     if (form.email && !/^\S+@\S+\.\S+$/.test(form.email)) e.email = "सही ई-मेल दें / Enter a valid email";
     return e;
-  }, [form]);
+  }, [form, isEdit]);
 
-  const nomineeErrors = useMemo(() => rowErrors(nominees), [nominees]);
+  const nomineeErrors = useMemo(() => rowErrors(nominees, !isEdit), [nominees, isEdit]);
   const referralErrors = useMemo(() => rowErrors(referrals, false), [referrals]);
   const listsValid = [...nomineeErrors, ...referralErrors].every((e) => Object.keys(e).length === 0);
 
@@ -211,7 +243,11 @@ const MembershipForm = () => {
     if (photo) URL.revokeObjectURL(photo);
     setPhoto(null);
     setPhotoFile(null);
+    setExistingPhoto("");
+    setPhotoRemoved(true);
   };
+
+  const shownPhoto = photo || (existingPhoto ? `${FILE_BASE_URL}${existingPhoto}` : null);
 
   const handlePhoto = (e) => {
     const file = e.target.files[0];
@@ -239,6 +275,18 @@ const MembershipForm = () => {
     data.append("referrals", JSON.stringify(referrals));
     if (photoFile) data.append("photo", photoFile);
 
+    if (isEdit) {
+      if (photoRemoved && !photoFile) data.append("removePhoto", "true");
+      try {
+        const res = await dispatch(saveMember({ id, formData: data })).unwrap();
+        toast.success(res.message);
+        navigate("/admin/members");
+      } catch (message) {
+        toast.error(message);
+      }
+      return;
+    }
+
     try {
       const res = await dispatch(submitMember(data)).unwrap();
       toast.success(res.message);
@@ -262,6 +310,8 @@ const MembershipForm = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  if (loadingMember) return <div className="py-20 text-center text-royal-700">Loading...</div>;
+
   return (
     <div id="membership" className="py-8 px-4">
       <div className="max-w-5xl mx-auto">
@@ -271,8 +321,10 @@ const MembershipForm = () => {
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-royal-700 via-royal-600 to-royal-500 px-6 py-8 mb-8 text-center shadow-lg border-b-4 border-gold-500">
           <div className="absolute -top-10 -left-10 h-32 w-32 rounded-full bg-gold-500/20" />
           <div className="absolute -bottom-12 -right-8 h-40 w-40 rounded-full bg-pink-brand/20" />
-          <h1 className="relative text-2xl md:text-4xl font-bold text-gold-400">॥ सदस्यता फार्म ॥</h1>
-          <p className="relative mt-2 text-sm md:text-base text-royal-100">Membership Form — * वाले सभी विवरण भरने पर ही Submit खुलेगा</p>
+          <h1 className="relative text-2xl md:text-4xl font-bold text-gold-400">{isEdit ? "॥ सदस्य संपादन ॥" : "॥ सदस्यता फार्म ॥"}</h1>
+          <p className="relative mt-2 text-sm md:text-base text-royal-100">
+            {isEdit ? "Edit Member — बदलाव करके Update दबाएं" : "Membership Form — * वाले सभी विवरण भरने पर ही Submit खुलेगा"}
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} noValidate>
@@ -281,8 +333,8 @@ const MembershipForm = () => {
               <label className="cursor-pointer group">
                 <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handlePhoto} />
                 <div className="w-36 h-36 rounded-full overflow-hidden border-2 border-dashed border-royal-500/40 bg-royal-50 flex flex-col items-center justify-center text-royal-500 transition group-hover:border-royal-500 group-hover:bg-royal-100">
-                  {photo ? (
-                    <img src={photo} alt="Preview" className="w-full h-full object-cover" />
+                  {shownPhoto ? (
+                    <img src={shownPhoto} alt="Preview" className="w-full h-full object-cover" />
                   ) : (
                     <>
                       <svg className="w-10 h-10 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -300,7 +352,7 @@ const MembershipForm = () => {
                 </div>
               </label>
             </div>
-            {photo && (
+            {shownPhoto && (
               <div className="flex justify-center mt-3">
                 <button type="button" onClick={removePhoto} className="rounded-full border border-red-200 bg-red-50 px-4 py-1 text-xs font-semibold text-red-600 hover:bg-red-100">
                   Remove Photo
@@ -365,7 +417,7 @@ const MembershipForm = () => {
               <Field label="ई-मेल / Email" error={err("email")}>
                 <input type="email" {...bind("email")} />
               </Field>
-              <Field label="जन्म तिथि / Date of Birth" required error={err("birthDate")}>
+              <Field label="जन्म तिथि / Date of Birth" required={!isEdit} error={err("birthDate")}>
                 <input type="date" {...bind("birthDate")} />
               </Field>
               <Field label="विवाह वर्षगांठ / Wedding Anniversary" error={err("anniversaryDate")}>
@@ -419,6 +471,7 @@ const MembershipForm = () => {
             itemLabel="नॉमिनी"
             addLabel="+ नॉमिनी जोड़ें / Add Nominee"
             showRelation
+            required={!isEdit}
             rows={nominees}
             errors={nomineeErrors}
             touched={listTouched.nominee}
@@ -451,7 +504,7 @@ const MembershipForm = () => {
               disabled={!isValid || submitting}
               className="w-full md:w-auto bg-royal-600 hover:bg-royal-700 text-white font-bold text-lg py-3 px-16 rounded-full shadow-lg border-b-4 border-gold-500 transition disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-royal-600"
             >
-              {submitting ? "Submitting..." : "Submit"}
+              {submitting ? (isEdit ? "Updating..." : "Submitting...") : isEdit ? "Update" : "Submit"}
             </button>
             {!isValid && <p className="text-xs text-gray-500 mt-2">* वाले सभी विवरण भरें / Fill all required (*) fields</p>}
           </div>
