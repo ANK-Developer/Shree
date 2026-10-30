@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from "react-router-dom";
+import Home from "../pages/Home";
 import MembershipForm from "../pages/Form";
 import Login from "../pages/admin/Login";
 import AdminLayout from "../layouts/AdminLayout";
@@ -14,6 +15,8 @@ import PublicOnlyRoute from "./PublicOnlyRoute";
 
 const AppRoutes = () => (
   <Routes>
+    {/* Public landing page */}
+    <Route path="/home" element={<Home />} />
     {/* Login nahi hai to ProtectedRoute login page par bhej deta hai */}
     <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
 
