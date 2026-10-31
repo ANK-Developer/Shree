@@ -83,7 +83,7 @@ function get_important_dates(): void
 
         json_response(200, ['success' => true, 'dates' => $rows, 'pagination' => paginate($page, $limit, $count)]);
     } catch (Throwable $e) {
-        error_log('getImportantDates failed: ' . $e->getMessage());
-        fail(500, 'Server error');
+        log_error('getImportantDates failed', $e);
+        fail(500, 'Server error (ref: ' . request_id() . ')');
     }
 }

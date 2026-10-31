@@ -31,7 +31,7 @@ function get_dashboard(): void
             'importantDates' => $importantDates,
         ]);
     } catch (Throwable $e) {
-        error_log('getDashboard failed: ' . $e->getMessage());
-        fail(500, 'Server error');
+        log_error('getDashboard failed', $e);
+        fail(500, 'Server error (ref: ' . request_id() . ')');
     }
 }

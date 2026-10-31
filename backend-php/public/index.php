@@ -18,6 +18,8 @@ if (PHP_SAPI === 'cli-server') {
 
 $src = __DIR__ . '/../src';
 require "$src/helpers.php";
+require "$src/logger.php";
+init_logging(__DIR__ . '/../logs'); // sabse pehle: aage koi bhi error ho, log file me aayega
 load_env(__DIR__ . '/../.env');
 date_default_timezone_set(env('TZ', 'Asia/Kolkata'));
 
@@ -25,12 +27,6 @@ require "$src/auth.php";
 require "$src/upload.php";
 require "$src/member_validation.php";
 foreach (glob("$src/controllers/*.php") as $controller) require $controller;
-
-ini_set('display_errors', '0');
-set_exception_handler(function (Throwable $e) {
-    error_log('Unhandled error: ' . $e->getMessage());
-    fail(500, 'Server error');
-});
 
 // ---------- CORS ----------
 // Comma-separated list allowed, e.g. "https://site.com,http://localhost:5173"
@@ -106,4 +102,5 @@ foreach ($routes as [$routeMethod, $pattern, $handler]) {
 }
 
 // 404 handler
+log_message('WARNING', 'Route not found');
 fail(404, 'Route not found');

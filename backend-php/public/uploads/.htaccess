@@ -3,3 +3,7 @@
   php_flag engine off
 </IfModule>
 Options -Indexes
+# PHP-FPM / LiteSpeed par upar wala php_flag kaam nahi karta, isliye PHP files seedha block
+<FilesMatch "\.(php|phtml|phar|php[0-9])$">
+  Require all denied
+</FilesMatch>

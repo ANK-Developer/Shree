@@ -1,0 +1,54 @@
+SHREE JI - cPanel UPLOAD GUIDE (Production)
+===========================================
+File: Shree-JI-production.zip  (frontend + PHP backend + database .sql + photos)
+
+STEP 1: Zip upload
+  1. cPanel > File Manager > public_html kholo
+  2. Purani files ho to pehle backup lo, phir Upload > Shree-JI-production.zip
+  3. Zip par right-click > Extract (public_html me hi)
+  4. Settings (upar-right) > "Show Hidden Files (dotfiles)" ON karo - .htaccess zaruri hai
+  5. Extract ke baad zip file delete kar do
+
+STEP 2: Database banao
+  1. cPanel > MySQL Databases > Create New Database (jaise shree -> cpuser_shree)
+  2. MySQL Users > Add New User (strong password)
+  3. Add User To Database > ALL PRIVILEGES
+
+STEP 3: Database import
+  1. phpMyAdmin > apna database > Import > public_html/shree_database.sql > Go
+  2. Import ke baad shree_database.sql DELETE kar do (security)
+
+STEP 4: .env banao
+  1. public_html/shree_backend/.env.example ko Copy karke naam do  .env
+  2. Edit karo:
+       DATABASE_URL=mysql://cpuser_shree_user:PASSWORD@localhost:3306/cpuser_shree
+       CLIENT_URL=https://aapka-domain.com
+       JWT_SECRET=koi-lamba-random-string-(32+ characters)
+       TZ=Asia/Kolkata
+     (Password me @ # / jaise special character na rakho.)
+
+STEP 5: Permission
+  public_html/uploads            -> 755 (ya 775)
+  public_html/shree_backend/logs -> 755 (ya 775)   <-- error log yahin banta hai
+
+STEP 6: Test
+  1. https://aapka-domain.com/api/health  -> {"success":true,...} aana chahiye
+  2. https://aapka-domain.com kholo, admin login karo
+  3. Member photo upload + list check karo
+
+ERROR LOG (kuch na chale ya random error aaye to)
+  File: public_html/shree_backend/logs/app.log   (File Manager se kholo / download karo)
+  - Har error: time, request id, URL, error message, file:line aur stack trace
+  - User ko screen par "Server error (ref: a1b2c3d4)" dikhta hai. Wahi ref
+    app.log me search karo - wahi error ki poori detail milegi.
+  - logs/php_errors.log me PHP ke apne errors (parse/fatal) aate hain
+  - 5MB se bada hone par app.log.1 ban jata hai (purana)
+  - logs folder web se band hai (browser se nahi khulta)
+
+Blank page / 500 error:
+  - cPanel > Select PHP Version: PHP 8.1+ , extensions: pdo_mysql, mbstring, fileinfo ON
+  - Pehle shree_backend/logs/app.log dekho, phir cPanel > Errors
+  - .htaccess hidden file extract hui ya nahi check karo
+  - .env bana hai ya nahi aur DATABASE_URL sahi hai ya nahi check karo
+
+Admin password badalna: login ke baad Admins page se.

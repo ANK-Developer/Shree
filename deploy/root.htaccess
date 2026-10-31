@@ -1,0 +1,25 @@
+RewriteEngine On
+RewriteCond %{HTTP:Authorization} .
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+Options -Indexes
+
+<IfModule mod_headers.c>
+    <FilesMatch "\.(jpe?g|png|webp)$">
+        Header set Access-Control-Allow-Origin "*"
+    </FilesMatch>
+</IfModule>
+
+# Kabhi web se na khulne wali cheezein
+<FilesMatch "\.(sql|log|env|md|txt)$">
+    Require all denied
+</FilesMatch>
+RewriteRule ^shree_backend(/|$) - [F,L]
+
+# API -> PHP front controller
+RewriteRule ^api(/.*)?$ api.php [QSA,L]
+
+# Real files (assets, uploads) seedhe, baaki sab React app (page refresh par bhi chale)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.html [L]

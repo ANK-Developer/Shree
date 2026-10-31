@@ -24,7 +24,7 @@ function login(): void
         $now = db_datetime(now_utc());
         query('UPDATE users SET lastLoginAt = ?, updatedAt = ? WHERE id = ?', [$now, $now, $user['id']]);
     } catch (Throwable $e) {
-        error_log('lastLoginAt update failed: ' . $e->getMessage());
+        log_error('lastLoginAt update failed', $e);
     }
 
     json_response(200, [

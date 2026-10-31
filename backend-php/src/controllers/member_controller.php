@@ -118,8 +118,8 @@ function create_member(): void
     } catch (Throwable $e) {
         remove_uploaded_file($photoUrl);
         if (is_duplicate_error($e)) fail(409, 'This mobile number is already registered');
-        error_log('createMember failed: ' . $e->getMessage());
-        fail(500, 'Server error');
+        log_error('createMember failed', $e);
+        fail(500, 'Server error (ref: ' . request_id() . ')');
     }
 }
 
@@ -328,7 +328,7 @@ function update_member(string $id): void
     } catch (Throwable $e) {
         remove_uploaded_file($newPhoto);
         if (is_duplicate_error($e)) fail(409, 'This mobile number is already registered');
-        error_log('updateMember failed: ' . $e->getMessage());
-        fail(500, 'Server error');
+        log_error('updateMember failed', $e);
+        fail(500, 'Server error (ref: ' . request_id() . ')');
     }
 }

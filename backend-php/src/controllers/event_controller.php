@@ -424,6 +424,6 @@ function get_calls(string $id, string $participantId): void
 
 function handle_error(Throwable $e, string $label): never
 {
-    error_log("$label failed: " . $e->getMessage());
-    fail(500, 'Server error');
+    log_error("$label failed", $e);
+    fail(500, 'Server error (ref: ' . request_id() . ')');
 }
